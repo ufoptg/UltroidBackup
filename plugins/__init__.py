@@ -13,6 +13,7 @@ from random import choice
 import requests
 from telethon import Button, events
 from telethon.tl import functions, types  # pylint:ignore
+from telethon.tl.custom.message import CustomMarkdown
 
 from pyUltroid import *
 from pyUltroid._misc._assistant import asst_cmd, callback, in_pattern
@@ -39,6 +40,7 @@ asst: UltroidClient
 
 LOG_CHANNEL = udB.get_key("LOG_CHANNEL")
 
+ultroid_bot..parse_mode = CustomMarkdown()
 
 def inline_pic():
     INLINE_PIC = udB.get_key("INLINE_PIC")
