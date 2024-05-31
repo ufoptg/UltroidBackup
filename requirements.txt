@@ -1,0 +1,6 @@
+# Important Requirements here.
+
+telethon
+https://github.com/New-dev0/Telethon-Patch/archive/main.zip
+python-decouple
+python-dotenv
