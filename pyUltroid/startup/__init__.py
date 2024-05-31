@@ -54,7 +54,7 @@ if run_as_module:
     HOSTED_ON = where_hosted()
     LOGS = getLogger("pyUltLogs")
     TelethonLogger = getLogger("Telethon")
-    TelethonLogger.setLevel(INFO)
+    TelethonLogger.setLevel(WARNING)
 
     _, v, __ = platform.python_version_tuple()
 
