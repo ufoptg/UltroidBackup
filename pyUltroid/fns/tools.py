@@ -5,6 +5,7 @@
 # PLease read the GNU Affero General Public License in
 # <https://github.com/TeamUltroid/pyUltroid/blob/main/LICENSE>.
 
+import aiohttp
 import json
 import math
 import os
