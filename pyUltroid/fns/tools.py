@@ -294,16 +294,17 @@ def text_set(text):
 
 class LogoHelper:
     @staticmethod
-    def get_text_size(text, image, font):
+    def get_text_bbox(text, image, font):
         im = Image.new("RGB", (image.width, image.height))
         draw = ImageDraw.Draw(im)
-        return draw.textlength(text, font)
+        return draw.textbbox((0, 0), text, font)
 
     @staticmethod
     def find_font_size(text, font, image, target_width_ratio):
         tested_font_size = 100
         tested_font = ImageFont.truetype(font, tested_font_size)
-        observed_width = LogoHelper.get_text_size(text, image, tested_font)
+        bbox = LogoHelper.get_text_bbox(text, image, tested_font)
+        observed_width = bbox[2] - bbox[0]
         estimated_font_size = (
             tested_font_size / (observed_width / image.width) * target_width_ratio
         )
@@ -318,19 +319,14 @@ class LogoHelper:
 
         img = Image.open(imgpath)
         width, height = img.size
-        fct = min(height, width)
-        if height != width:
-            img = img.crop((0, 0, fct, fct))
-        if img.height < 1000:
-            img = img.resize((1020, 1020))
-        width, height = img.size
         draw = ImageDraw.Draw(img)
         font_size = LogoHelper.find_font_size(text, funt, img, width_ratio)
         font = ImageFont.truetype(funt, font_size)
-        l, t, r, b = font.getbbox(text)
-        w, h = r - l, (b - t) * 1.5
+        bbox = LogoHelper.get_text_bbox(text, img, font)
+        x = (width - (bbox[2] - bbox[0])) / 2
+        y = (height - (bbox[3] - bbox[1])) / 2
         draw.text(
-            ((width - w) / 2, ((height - h) / 2)),
+            (x, y),
             text,
             font=font,
             fill=fill,
