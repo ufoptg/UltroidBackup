@@ -5,6 +5,7 @@
 # PLease read the GNU Affero General Public License in
 # <https://github.com/TeamUltroid/pyUltroid/blob/main/LICENSE>.
 
+import asyncio
 import aiohttp
 import json
 import math
@@ -16,6 +17,7 @@ import ssl
 from io import BytesIO
 from json.decoder import JSONDecodeError
 from traceback import format_exc
+from subprocess import PIPE
 
 import requests
 
@@ -234,34 +236,82 @@ _webupload_cache = {}
 
 
 async def webuploader(chat_id: int, msg_id: int, uploader: str):
-    file = _webupload_cache[int(chat_id)][int(msg_id)]
+    LOGS.info("webuploader function called with uploader: %s", uploader)
+    if chat_id in _webupload_cache and msg_id in _webupload_cache[chat_id]:
+        file = _webupload_cache[chat_id][msg_id]
+    else:
+        return "File not found in cache."
+
     sites = {
-        "anonfiles": {"url": "https://api.anonfiles.com/upload", "json": True},
         "siasky": {"url": "https://siasky.net/skynet/skyfile", "json": True},
-        "file.io": {"url": "https://file.io", "json": True},
-        "bayfiles": {"url": "https://api.bayfiles.com/upload", "json": True},
-        "x0.at": {"url": "https://x0.at/", "json": False},
+        "file.io": {"url": "https://file.io/", "json": True},
+        "0x0.st": {"url": "https://0x0.st", "json": False},
         "transfer": {"url": "https://transfer.sh", "json": False},
+        "catbox": {"url": "https://catbox.moe/user/api.php", "json": False},
+        "litterbox": {"url": "https://litterbox.catbox.moe/resources/internals/api.php", "json": False},
+        "filebin": {"url": "https://filebin.net", "json": False},
     }
+
     if uploader and uploader in sites:
         url = sites[uploader]["url"]
-        json = sites[uploader]["json"]
-    with open(file, "rb") as data:
-        # todo: add progress bar
-        status = await async_searcher(
-            url, data={"file": data.read()}, post=True, re_json=json
-        )
-    if isinstance(status, dict):
-        if "skylink" in status:
-            return f"https://siasky.net/{status['skylink']}"
-        if status["status"] == 200 or status["status"] is True:
+        json_format = sites[uploader]["json"]
+    else:
+        return "Uploader not supported or invalid."
+
+    files = {"file": open(file, "rb")}  # Adjusted for both formats
+
+    try:
+        if uploader == "filebin":
+            cmd = f"curl -X POST --data-binary '@{file}' -H 'filename: \"{file}\"' \"{url}\""
+            process = await asyncio.create_subprocess_shell(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+            stdout, stderr = await process.communicate()
+            stdout = stdout.decode()
+            stderr = stderr.decode()
+            if process.returncode == 0:
+                response_json = json.loads(stdout)
+                bin_id = response_json.get("bin", {}).get("id")
+                if bin_id:
+                    filebin_url = f"https://filebin.net/{bin_id}"
+                    return filebin_url
+                else:
+                    return "Failed to extract bin ID from Filebin response"
+            else:
+                return f"Failed to upload file to Filebin: {stderr.strip()}"
+        elif uploader == "catbox":
+            cmd = f"curl -F reqtype=fileupload -F time=24h -F 'fileToUpload=@{file}' {url}"
+        elif uploader == "litterbox":
+            cmd = f"curl -F 'reqtype=fileupload' -F 'time=1h' -F 'fileToUpload=@{file}' {url}"
+        elif uploader == "0x0.st":
+            cmd = f"curl -F 'file=@{file}' {url}"
+        elif uploader == "file.io" or uploader == "siasky":
             try:
-                link = status["link"]
-            except KeyError:
-                link = status["data"]["file"]["url"]["short"]
-            return link
-    del _webupload_cache[int(chat_id)][int(msg_id)]
-    return status
+                status = await async_searcher(
+                    url, data=files, post=True, re_json=json_format
+                )
+            except Exception as e:
+                return f"Failed to upload file: {e}"
+            if isinstance(status, dict):
+                if "skylink" in status:
+                    return f"https://siasky.net/{status['skylink']}"
+                if status.get("status") == 200:
+                    return status.get("link")
+        else:
+            raise ValueError("Uploader not supported")
+
+        process = await asyncio.create_subprocess_shell(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+        stdout, stderr = await process.communicate()
+        stdout = stdout.decode()
+        stderr = stderr.decode()
+        if process.returncode == 0:
+            return stdout.strip()
+        else:
+            return f"Failed to upload file: {stderr.strip()}"
+    except Exception as e:
+        return f"Failed to upload file: {e}"
+
+    finally:
+        files["file"].close()
+        del _webupload_cache.get(chat_id, {})[msg_id]
 
 
 def get_all_files(path, extension=None):
