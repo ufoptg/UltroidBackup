@@ -120,3 +120,33 @@ Ultroid is licensed under [GNU Affero General Public License](https://www.gnu.or
 * [MarshalX](https://github.com/MarshalX) for [PyTgCalls.](https://github.com/MarshalX/tgcalls)
 
 > Made with 💕 by [@TeamUltroid](https://t.me/TeamUltroid).    
+
+
+
+
+# the steps are simple...
+#### if your using screen you open your screen first!
+
+#### You git clone the repo
+
+### git clone https://github.com/ufoptg/UltroidBackup.git
+
+### cd UltroidBackup
+
+### virtualenv -p /usr/bin/python3 venv
+
+### pip3 install -U -r re*/st*/optional-requirements.txt
+
+### pip3 install -U -r requirements.txt
+
+####then you make sure your .env is filled out 
+
+
+### python3 -m pyUltroid &
+
+if on vps
+### deactivate
+### exit
+
+if using screen
+deatch screen
