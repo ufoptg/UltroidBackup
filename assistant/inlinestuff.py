@@ -106,63 +106,93 @@ async def _(e):
 
 
 @in_pattern("fl2lnk ?(.*)", owner=True)
-async def _(e):
-    match = e.pattern_match.group(1)
+async def fl2lnk_command(event):
+    match = event.pattern_match.group(1)
+    if not match or ":" not in match:
+        await event.respond(
+            "Invalid format. Please provide chat ID and message ID in the format 'chat_id:message_id'."
+        )
+        return
+
     chat_id, msg_id = match.split(":")
-    filename = _webupload_cache[int(chat_id)][int(msg_id)]
+    try:
+        filename = _webupload_cache[int(chat_id)][int(msg_id)]
+    except (KeyError, ValueError):
+        await event.respond("File not found or invalid chat ID/message ID.")
+        return
+
     if "/" in filename:
         filename = filename.split("/")[-1]
-    __cache = f"{chat_id}:{msg_id}"
+
+    cache_key = f"{chat_id}:{msg_id}"
     buttons = [
         [
-            Button.inline("anonfiles", data=f"flanonfiles//{__cache}"),
-            Button.inline("transfer", data=f"fltransfer//{__cache}"),
+            Button.inline("Catbox", data=f"flcatbox//{cache_key}"),
+            Button.inline("transfer", data=f"fltransfer//{cache_key}"),
         ],
         [
-            Button.inline("bayfiles", data=f"flbayfiles//{__cache}"),
-            Button.inline("x0.at", data=f"flx0.at//{__cache}"),
+            Button.inline("0x0.st", data=f"fl0x0.st//{cache_key}"),
+            Button.inline("File.io", data=f"flfile.io//{cache_key}"),
         ],
         [
-            Button.inline("file.io", data=f"flfile.io//{__cache}"),
-            Button.inline("siasky", data=f"flsiasky//{__cache}"),
+            Button.inline("Litterbox", data=f"fllitterbox//{cache_key}"),
+            Button.inline("Filebin", data=f"flfilebin//{cache_key}"),
         ],
     ]
+
     try:
-        lnk = [
-            await e.builder.article(
+        articles = [
+            await event.builder.article(
                 title=f"Upload {filename}",
                 text=f"**File:**\n{filename}",
                 buttons=buttons,
             )
         ]
-    except BaseException as er:
-        LOGS.exception(er)
-        lnk = [
-            await e.builder.article(
+    except Exception as e:
+        LOGS.exception(e)
+        articles = [
+            await event.builder.article(
                 title="fl2lnk",
-                text="File not found",
+                text="File not found or error in processing.",
             )
         ]
-    await e.answer(lnk, switch_pm="File to Link.", switch_pm_param="start")
+
+    await event.answer(articles, switch_pm="File to Link.", switch_pm_param="start")
 
 
-@callback(
-    re_compile(
-        "fl(.*)",
-    ),
-    owner=True,
-)
-async def _(e):
-    t = (e.data).decode("UTF-8")
-    data = t[2:]
-    host = data.split("//")[0]
-    chat_id, msg_id = data.split("//")[1].split(":")
-    filename = _webupload_cache[int(chat_id)][int(msg_id)]
+@callback(re_compile("fl(.*)"), owner=True)
+async def fl_callback(event):
+    data = event.data.decode("UTF-8")[2:]
+    parts = data.split("//")
+    if len(parts) != 2 or ":" not in parts[1]:
+        await event.respond("Invalid callback data format.")
+        return
+
+    host = parts[0]
+    chat_id, msg_id = parts[1].split(":")
+
+    try:
+        filename = _webupload_cache[int(chat_id)][int(msg_id)]
+    except (KeyError, ValueError):
+        await event.respond("File not found or invalid chat ID/message ID.")
+        return
+
     if "/" in filename:
         filename = filename.split("/")[-1]
-    await e.edit(f"Uploading `{filename}` on {host}")
-    link = (await webuploader(chat_id, msg_id, host)).strip().replace("\n", "")
-    await e.edit(f"Uploaded `{filename}` on {host}.", buttons=Button.url("View", link))
+
+    await event.edit(f"Uploading `{filename}` on {host}")
+
+    link = await webuploader(int(chat_id), int(msg_id), host)
+    if link.startswith("http"):
+        await event.edit(
+            f"Uploaded `{filename}` on {host}.", buttons=Button.url("View", link)
+        )
+        try:
+            os.remove(f"resources/downloads/{filename}")
+        except FileNotFoundError:
+            pass
+    else:
+        await event.edit(f"Failed to upload `{filename}` on {host}. Error: {link}")
 
 
 @in_pattern("repo", owner=True)
