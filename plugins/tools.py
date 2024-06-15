@@ -44,7 +44,7 @@ from telethon.tl.types import (
 from pyUltroid.fns.tools import metadata, translate
 
 from . import *
-from . import HNDLR, LOGS, NIMConfig, bash, con, eor, get_pstring
+from . import HNDLR, LOGS, ULTConfig, bash, con, eor, get_string
 from . import humanbytes as hb
 from . import inline_mention, mediainfo, ultroid_cmd
 
@@ -406,7 +406,7 @@ async def sangmata(event):
 
 @ultroid_cmd(pattern="webshot( (.*)|$)")
 async def webss(event):
-    xx = await event.eor(get_pstring("com_1", "load"))
+    xx = await event.eor(get_string("com_1")
     xurl = event.pattern_match.group(1).strip()
     if xurl:
         x = get(f"https://mini.s-shot.ru/1920x1080/JpE6/1024/7100/?{xurl}")
