@@ -3,3 +3,4 @@
 https://github.com/ufoptg/Telethon/archive/refs/tags/UltroidV2.zip
 python-decouple
 python-dotenv
+pyshorteners
