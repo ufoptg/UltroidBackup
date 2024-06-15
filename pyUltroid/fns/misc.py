@@ -187,13 +187,13 @@ async def ReTrieveFile(input_file_name):
 
 async def unsplashsearch(query, limit=None, shuf=True):
     query = query.replace(" ", "-")
-    link = "https://unsplash.com/s/photos/" + query
+    link = f"https://unsplash.com/s/photos/{query}"
     extra = await async_searcher(link, re_content=True)
     res = BeautifulSoup(extra, "html.parser", from_encoding="utf-8")
     all_ = res.find_all("img", srcset=re.compile("images.unsplash.com/photo"))
     if shuf:
         shuffle(all_)
-    return list(map(lambda e: e['src'], all_[:limit]))
+    return list(map(lambda e: e["src"], all_[:limit]))
 
 
 # ---------------- Random User Gen ----------------
