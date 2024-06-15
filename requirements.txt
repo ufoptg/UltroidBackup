@@ -1,5 +1,5 @@
 # Important Requirements here.
 
-https://github.com/ufoptg/Telethon/archive/refs/tags/Ultroid.zip
+https://github.com/ufoptg/Telethon/archive/refs/tags/UltroidV2.zip
 python-decouple
 python-dotenv
