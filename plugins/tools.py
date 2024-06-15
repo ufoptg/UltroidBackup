@@ -1,46 +1,21 @@
-# Ultroid - UserBot
-# Copyright (C) 2021-2023 TeamUltroid
+# Ultroid ~ UserBot
+# Copyright (C) 2023 Ultroid
 #
-# This file is a part of < https://github.com/TeamUltroid/Ultroid/ >
+# This file is a part of < https://github.com/ufoptg/UltroidBackup/ >
 # PLease read the GNU Affero General Public License in
-# <https://www.github.com/TeamUltroid/Ultroid/blob/main/LICENSE/>.
-"""
-✘ Commands Available -
+# <https://www.github.com/ufoptg/UltroidBackup/blob/main/LICENSE/>.
 
-• `{i}circle`
-    Reply to a audio song or gif to get video note.
+from . import get_help
 
-• `{i}ls`
-    Get all the Files inside a Directory.
+__doc__ = get_help("help_tools")
 
-• `{i}bots`
-    Shows the number of bots in the current chat with their perma-link.
-
-• `{i}hl <a link> <text-optional>`
-    Embeds the link with a whitespace as message.
-
-• `{i}id`
-    Reply a Sticker to Get Its Id
-    Reply a User to Get His Id
-    Without Replying You Will Get the Chat's Id
-
-• `{i}sg <reply to a user><username/id>`
-    Get His Name History of the replied user.
-
-• `{i}tr <dest lang code> <(reply to) a message>`
-    Get translated message.
-
-• `{i}webshot <url>`
-    Get a screenshot of the webpage.
-
-• `{i}shorturl <url> <id-optional>`
-    shorten any url...
-"""
+import asyncio
 import glob
 import io
 import os
-import secrets
-from asyncio.exceptions import TimeoutError as AsyncTimeout
+import re
+
+import pyshorteners
 
 try:
     import cv2
@@ -56,7 +31,10 @@ try:
 except ImportError:
     WebShot = None
 
+from bs4 import BeautifulSoup
+from requests import get
 from telethon.errors.rpcerrorlist import MessageTooLongError, YouBlockedUserError
+from telethon.tl.functions.contacts import UnblockRequest as unblock
 from telethon.tl.types import (
     ChannelParticipantAdmin,
     ChannelParticipantsBots,
@@ -65,28 +43,30 @@ from telethon.tl.types import (
 
 from pyUltroid.fns.tools import metadata, translate
 
-from . import (
-    HNDLR,
-    LOGS,
-    ULTConfig,
-    async_searcher,
-    bash,
-    check_filename,
-    con,
-    download_file,
-    eor,
-    get_string,
-)
+from . import *
+from . import HNDLR, LOGS, NIMConfig, bash, con, eor, get_pstring
 from . import humanbytes as hb
-from . import inline_mention, is_url_ok, json_parser, mediainfo, ultroid_cmd
+from . import inline_mention, mediainfo, ultroid_cmd
 
 
-@ultroid_cmd(pattern="tr( (.*)|$)", manager=True)
+def sanga_seperator(sanga_list):
+    string = "".join(info[info.find("\n") + 1 :] for info in sanga_list)
+    string = re.sub(r"^$\n", "", string, flags=re.MULTILINE)
+    name, username = string.split("Usernames**")
+    name = name.split("Names")[1]
+    return name, username
+
+
+def mentionuser(name, userid):
+    return f"[{name}](tg://user?id={userid})"
+
+
+@ultroid_cmd(pattern="tl( (.*)|$)", manager=True)
 async def _(event):
-    input = event.pattern_match.group(1).strip().split(maxsplit=1)
-    txt = input[1] if len(input) > 1 else None
-    if input:
-        input = input[0]
+    input_ = event.pattern_match.group(1).strip().split(maxsplit=1)
+    txt = input_[1] if len(input_) > 1 else None
+    if input_:
+        input_ = input_[0]
     if txt:
         text = txt
     elif event.is_reply:
@@ -96,10 +76,35 @@ async def _(event):
         return await eor(
             event, f"`{HNDLR}tr LanguageCode` as reply to a message", time=5
         )
-    lan = input or "en"
+    lan = input_ or "en"
     try:
         tt = await translate(text, lang_tgt=lan)
-        output_str = f"**TRANSLATED** to {lan}\n{tt}"
+        output_str = f"**Ⲧʀⲁⲛⲋⳑⲁⲧⲉⲇ**\n\n**Ⲋⲟυʀⲥⲉ**:\n`{text}`\n\n**Ⲧʀⲁⲛⲋⳑⲁⲧⲓⲟⲛ** (`{lan}`):\n`{tt}`"
+        await event.eor(output_str)
+    except Exception as exc:
+        LOGS.exception(exc)
+        await event.eor(str(exc), time=5)
+
+
+@ultroid_cmd(pattern="tr( (.*)|$)", manager=True)
+async def _(event):
+    input_ = event.pattern_match.group(1).strip().split(maxsplit=1)
+    txt = input_[1] if len(input_) > 1 else None
+    if input_:
+        input_ = input_[0]
+    if txt:
+        text = txt
+    elif event.is_reply:
+        previous_message = await event.get_reply_message()
+        text = previous_message.message
+    else:
+        return await eor(
+            event, f"`{HNDLR}tl LanguageCode` as reply to a message", time=5
+        )
+    lan = input_ or "en"
+    try:
+        tt = await previous_message.translate(lan)
+        output_str = f"**Ⲧʀⲁⲛⲋⳑⲁⲧⲉⲇ**\n\n**Ⲋⲟυʀⲥⲉ**:\n`{text}`\n\n**Ⲧʀⲁⲛⲋⳑⲁⲧⲓⲟⲛ** (`{lan}`):\n`{tt}`"
         await event.eor(output_str)
     except Exception as exc:
         LOGS.exception(exc)
@@ -112,8 +117,7 @@ async def _(event):
 )
 async def _(event):
     ult = event
-    match = event.pattern_match.group(1).strip()
-    if match:
+    if match := event.pattern_match.group(1).strip():
         try:
             ids = await event.client.parse_id(match)
         except Exception as er:
@@ -186,7 +190,7 @@ async def _(e):
         try:
             bbbb = await reply.download_media(thumb=-1)
         except TypeError:
-            bbbb = ULTConfig.thumb
+            bbbb = NIMConfig.thumb
         im = cv2.imread(bbbb)
         dsize = (512, 512)
         output = cv2.resize(im, dsize, interpolation=cv2.INTER_AREA)
@@ -229,7 +233,7 @@ async def _(e):
                 e.chat_id,
                 file,
                 video_note=True,
-                thumb=ULTConfig.thumb,
+                thumb=NIMConfig.thumb,
                 reply_to=reply,
             )
             os.remove(file)
@@ -268,8 +272,8 @@ async def _(e):
     files = glob.glob(files)
     if not files:
         return await e.eor("`Directory Empty or Incorrect.`", time=5)
-    folders = []
     allfiles = []
+    folders = []
     for file in sorted(files):
         if os.path.isdir(file):
             folders.append(f"📂 {file}")
@@ -307,11 +311,7 @@ async def _(e):
             else:
                 if hb(int(os.path.getsize(name))):
                     text += (
-                        emoji
-                        + f" `{nam}`"
-                        + "  `"
-                        + hb(int(os.path.getsize(name)))
-                        + "`\n"
+                        f"{emoji} `{nam}`  `{hb(int(os.path.getsize(name)))}" + "`\n"
                     )
                     fls += int(os.path.getsize(name))
                 else:
@@ -334,128 +334,140 @@ async def _(e):
     except MessageTooLongError:
         with io.BytesIO(str.encode(text)) as out_file:
             out_file.name = "output.txt"
-            await e.reply(f"`{e.text}`", file=out_file, thumb=ULTConfig.thumb)
+            await e.reply(f"`{e.text}`", file=out_file, thumb=NIMConfig.thumb)
         await e.delete()
 
 
 @ultroid_cmd(
-    pattern="sg( (.*)|$)",
+    pattern="sg(|u)(?:\\s|$)([\\s\\S]*)",
+    fullsudo=True,
 )
-async def lastname(steal):
-    mat = steal.pattern_match.group(1).strip()
-    message = await steal.get_reply_message()
-    if mat:
-        try:
-            user_id = await steal.client.parse_id(mat)
-        except ValueError:
-            user_id = mat
-    elif message:
-        user_id = message.sender_id
-    else:
-        return await steal.eor("`Use this command with reply or give Username/id...`")
-    chat = "@SangMataInfo_bot"
-    id = f"/search_id {user_id}"
-    lol = await steal.eor(get_string("com_1"))
+async def sangmata(event):
+    "To get name/username history."
+    cmd = event.pattern_match.group(1)
+    user = event.pattern_match.group(2)
+    reply = await event.get_reply_message()
+    if not user and reply:
+        user = str(reply.sender_id)
+    if not user:
+        await event.edit(
+            "`Reply to  user's text message to get name/username history or give userid/username`",
+        )
+        await asyncio.sleep(10)
+        return await event.delete()
+
     try:
-        async with steal.client.conversation(chat) as conv:
+        if user.isdigit():
+            userinfo = await ultroid_bot.get_entity(int(user))
+        else:
+            userinfo = await ultroid_bot.get_entity(user)
+    except ValueError:
+        userinfo = None
+    if not isinstance(userinfo, types.User):
+        await event.edit("`Can't fetch the user...`")
+        await asyncio.sleep(10)
+        return await event.delete()
+
+    await event.edit("`Processing...`")
+    async with event.client.conversation("@SangMata_beta_bot") as conv:
+        try:
+            await conv.send_message(f"{userinfo.id}")
+        except YouBlockedUserError:
+            await catub(unblock("SangMata_beta_bot"))
+            await conv.send_message(f"{userinfo.id}")
+        responses = []
+        while True:
             try:
-                msg = await conv.send_message(id)
-                response = await conv.get_response()
-                respond = await conv.get_response()
-                responds = await conv.get_response()
-            except YouBlockedUserError:
-                return await lol.edit("Please unblock @sangmatainfo_bot and try again")
-            if (
-                (response and response.text == "No records found")
-                or (respond and respond.text == "No records found")
-                or (responds and responds.text == "No records found")
-            ):
-                await lol.edit("No records found for this user")
-                await steal.client.delete_messages(conv.chat_id, [msg.id, response.id])
-            elif response.text.startswith("🔗"):
-                await lol.edit(respond.message)
-                await lol.reply(responds.message)
-            elif respond.text.startswith("🔗"):
-                await lol.edit(response.message)
-                await lol.reply(responds.message)
-            else:
-                await lol.edit(respond.message)
-                await lol.reply(response.message)
-            await steal.client.delete_messages(
-                conv.chat_id,
-                [msg.id, responds.id, respond.id, response.id],
-            )
-    except AsyncTimeout:
-        await lol.edit("Error: @SangMataInfo_bot is not responding!.")
+                response = await conv.get_response(timeout=2)
+            except asyncio.TimeoutError:
+                break
+            responses.append(response.text)
+        await event.client.send_read_acknowledge(conv.chat_id)
+
+    if not responses:
+        await event.edit("`Bot can't fetch results`")
+        await asyncio.sleep(10)
+        await event.delete()
+    if "No records found" in responses or "No data available" in responses:
+        await event.edit("`The user doesn't have any record`")
+        await asyncio.sleep(10)
+        await event.delete()
+
+    names, usernames = sanga_seperator(responses)
+    check = (usernames, "Username") if cmd == "u" else (names, "Name")
+    user_name = (
+        f"{userinfo.first_name} {userinfo.last_name}"
+        if userinfo.last_name
+        else userinfo.first_name
+    )
+    output = f"**➜ User Info :**  {mentionuser(user_name, userinfo.id)}\n**➜ {check[1]} History :**\n{check[0]}"
+    await event.edit(output)
 
 
 @ultroid_cmd(pattern="webshot( (.*)|$)")
 async def webss(event):
-    xx = await event.eor(get_string("com_1"))
+    xx = await event.eor(get_pstring("com_1", "load"))
     xurl = event.pattern_match.group(1).strip()
-    if not xurl:
-        return await xx.eor(get_string("wbs_1"), time=5)
-    if not (await is_url_ok(xurl)):
-        return await xx.eor(get_string("wbs_2"), time=5)
-    path, pic = check_filename("shot.png"), None
-    if async_playwright:
-        try:
-            async with async_playwright() as playwright:
-                chrome = await playwright.chromium.launch()
-                page = await chrome.new_page()
-                await page.goto(xurl)
-                await page.screenshot(path=path, full_page=True)
-                pic = path
-        except Exception as er:
-            LOGS.exception(er)
-            await xx.respond(f"Error with playwright:\n`{er}`")
-    if WebShot and not pic:
-        try:
-            shot = WebShot(
-                quality=88, flags=["--enable-javascript", "--no-stop-slow-scripts"]
+    if xurl:
+        x = get(f"https://mini.s-shot.ru/1920x1080/JpE6/1024/7100/?{xurl}")
+        y = "shot.jpg"
+        with open(y, "wb") as f:
+            f.write(x.content)
+        if (await ultroid_bot.get_me()).premium:
+            await ultroid_bot.send_file(
+                event.chat_id,
+                y,
+                caption=f"[📷](emoji/5258205968025525531)**WebShot Generated**\n[🔗](emoji/5983262173474853675)**URL** : {xurl}",
+                force_document=False,
             )
-            pic = await shot.create_pic_async(url=xurl)
-        except Exception as er:
-            LOGS.exception(er)
-    if not pic:
-        pic, msg = await download_file(
-            f"https://shot.screenshotapi.net/screenshot?&url={xurl}&output=image&file_type=png&wait_for_event=load",
-            path,
-            validate=True,
-        )
-        if msg:
-            await xx.edit(json_parser(msg, indent=1))
-            return
-    if pic:
-        await xx.reply(
-            get_string("wbs_3").format(xurl),
-            file=pic,
-            link_preview=False,
-            force_document=True,
-        )
-        os.remove(pic)
+        else:
+            await ultroid_bot.send_file(
+                event.chat_id,
+                y,
+                caption=f"📷**WebShot Generated**\n🔗**URL** : {xurl}",
+                force_document=False,
+            )
+        os.remove(y)
+    else:
+        await eod(xx, f"Please provide me a URL...", time=5)
     await xx.delete()
 
 
-@ultroid_cmd(pattern="shorturl")
-async def magic(event):
+@ultroid_cmd(pattern="shorturl ?(.*)")
+async def short_url(event):
+    input_url = event.pattern_match.group(1)
+
+    if not input_url:
+        reply_msg = await event.get_reply_message()
+        if reply_msg:
+            input_url = reply_msg.text
+        else:
+            return await eor(event, "`Please provide a URL to shorten.`")
+
     try:
-        match = event.text.split(maxsplit=1)[1].strip()
-    except IndexError:
-        return await event.eor("`Provide url to turn into tiny...`")
-    data = {
-        "url": match.split()[0],
-        "id": match[1] if len(match) > 1 else secrets.token_urlsafe(6),
-    }
-    data = await async_searcher(
-        "https://tiny.ultroid.tech/api/new",
-        data=data,
-        post=True,
-        re_json=True,
-    )
-    response = data.get("response", {})
-    if not response.get("status"):
-        return await event.eor(f'**ERROR :** `{response["message"]}`')
-    await event.eor(
-        f"• **Ultroid Tiny**\n• Given Url : {url}\n• Shorten Url : {data['response']['tinyUrl']}"
-    )
+        s = pyshorteners.Shortener()
+        if input_url.lower().startswith("https://tinyurl.com/"):
+            response = get(input_url)
+            soup = BeautifulSoup(response.text, "html.parser")
+            original_url = soup.find("a", {"target": "_blank"}).get("href")
+            output_message = (
+                f"**Expanded URL**\n"
+                f"**Given Link** ➠ **{input_url}**\n"
+                f"**Expanded Link** ➠ **{original_url}**"
+            )
+        else:
+            shortened_url = s.tinyurl.short(input_url)
+            output_message = (
+                f"**Shortened URL**\n"
+                f"**Given Link** ➠ **{input_url}**\n"
+                f"**Shortened Link** ➠ **{shortened_url}**"
+            )
+
+        if event.reply_to_msg_id:
+            await event.delete()
+            await event.reply(output_message)
+        else:
+            await eor(event, output_message)
+
+    except Exception as e:
+        await eor(event, f"An error occurred: {e}")
