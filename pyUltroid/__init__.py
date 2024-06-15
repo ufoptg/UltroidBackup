@@ -7,6 +7,8 @@
 
 import os
 import sys
+import dns.resolver
+import socket
 
 from .version import __version__
 
@@ -16,6 +18,27 @@ run_as_module = __package__ in sys.argv or sys.argv[0] == "-m"
 class ULTConfig:
     lang = "en"
     thumb = "resources/extras/ultroid.jpg"
+
+
+def custom_resolver(hostname):
+    resolver = dns.resolver.Resolver()
+    resolver.nameservers = ["8.8.8.8", "8.8.4.4"]  # Using Google's DNS servers
+    answers = resolver.resolve(hostname, "A")
+    return answers[0].address
+
+
+original_getaddrinfo = socket.getaddrinfo
+
+
+def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    try:
+        ip = custom_resolver(host)
+        return [(socket.AF_INET, socket.SOCK_STREAM, proto, "", (ip, port))]
+    except Exception as e:
+        return original_getaddrinfo(host, port, family, type, proto, flags)
+
+
+socket.getaddrinfo = custom_getaddrinfo
 
 
 if run_as_module:
