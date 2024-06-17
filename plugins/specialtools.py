@@ -137,7 +137,22 @@ async def adaudroid(e):
     os.remove(File[0])
 
 
-@ultroid_cmd(
+async def tfhoro(sign, day, token):
+    url = "https://us-central1-tf-natal.cloudfunctions.net/horoscopeapi_test"
+    headers = {"Authorization": "Bearer " + token}
+    data = {"sign": sign, "date": day}
+
+    response = await async_searcher(
+        url, post=True, headers=headers, data=data, re_json=True
+    )
+
+    if response:
+        return response
+    else:
+        return {"Error": "No response from server"}
+
+
+@nimbus_cmd(
     pattern=r"dob( (.*)|$)",
 )
 async def hbd(event):
@@ -149,7 +164,7 @@ async def hbd(event):
         nam = await kk.get_sender()
         name = nam.first_name
     else:
-        name = ultroid_bot.me.first_name
+        name = nimbus_bot.me.first_name
     zn = pytz.timezone("Asia/Kolkata")
     abhi = dt.now(zn)
     kk = match.split("/")
@@ -213,11 +228,9 @@ async def hbd(event):
         sign = "Scorpio" if (day < 22) else "Sagittarius"
     elif month == "12":
         sign = "Sagittarius" if (day < 22) else "Capricorn"
-    json = await async_searcher(
-        f"https://aztro.sameerkumar.website/?sign={sign}&day=today",
-        post=True,
-        re_json=True,
-    )
+        
+    json = await tfhoro(f"{sign}", "today", "mmEUtLATc8w_UNnHuR2")
+    
     dd = json.get("current_date")
     ds = json.get("description")
     lt = json.get("lucky_time")
@@ -228,24 +241,24 @@ async def hbd(event):
     await event.client.send_message(
         event.chat_id,
         f"""
-    Name -: {name}
+    **Nᴀᴍᴇ** -: {name}
 
-D.O.B -:  {match}
+**D.O.B** -:  `{match}`
 
-Lived -:  {saal}yr, {mahina}m, {din}d, {ghanta}hr, {mi}min, {slive}sec
+**Lɪᴠᴇᴅ** -:  `{saal}`ʏʀ, `{mahina}`ᴍ, `{din}`ᴅ, `{ghanta}`ʜʀ, `{mi}`ᴍɪɴ, `{slive}`sᴇᴄ
+     
+**Bɪʀᴛʜᴅᴀʏ** -: `{hp}`
 
-Birthday -: {hp}
+**Zᴏᴅɪᴀᴄ** -: {sign}
 
-Zodiac -: {sign}
+⌬**Hᴏʀᴏsᴄᴏᴘᴇ Oɴ {dd} **
+╰•__{ds}__
 
-**Horoscope On {dd} -**
 
-`{ds}`
-
-    Lucky Time :-        {lt}
-    Lucky Number :-   {ln}
-    Lucky Color :-        {cl}
-    Mood :-                   {md}
+    **Lᴜᴄᴋʏ Tɪᴍᴇ**  :-        `{lt}`
+    **Lᴜᴄᴋʏ Nᴜᴍʙᴇʀ** :-   `{ln}`
+    **Lᴜᴄᴋʏ Cᴏʟᴏʀ** :-        {cl}
+    **Mᴏᴏᴅ** :-                   {md}
     """,
         reply_to=event.reply_to_msg_id,
     )
