@@ -397,7 +397,7 @@ async def get_paste(data: str, extension: str = "txt"):
     ssl_context = ssl.create_default_context(cafile=certifi.where())
     json = {"content": data, "extension": extension}
     key = await async_searcher(
-        url="https://spaceb.in/api/v1/documents/",
+        url="https://spaceb.in/api/",
         json=json,
         ssl=ssl_context,
         post=True,
