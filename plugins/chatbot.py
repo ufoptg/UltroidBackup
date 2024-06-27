@@ -12,10 +12,10 @@ __doc__ = get_help("help_chatbot")
 
 from pyUltroid.fns.tools import get_chatbot_reply, get_oracle_reply
 
-from . import LOGS, Keys, eod, get_string, inline_mention, udB, ultroid_bot, ultroid_cmd
+from . import LOGS, eod, get_string, inline_mention, udB, ultroid_bot, ultroid_cmd
 
 try:
-    mongouri = Keys.MONGO_URI
+    mongouri = udB.get_key("MONGO_URI")
 except AttributeError:
     if udB.get_key("MONGO_URI"):
         mongouri = udB.get_key("MONGO_URI")
