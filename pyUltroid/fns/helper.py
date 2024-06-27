@@ -11,6 +11,7 @@ import os
 import re
 import sys
 import time
+import traceback
 from traceback import format_exc
 from urllib.parse import unquote
 from urllib.request import urlretrieve
@@ -74,6 +75,27 @@ def run_async(function):
 
     return wrapper
 
+def ErrInfo(exception, full=False):
+    exception_message = str(exception)
+    exception_type, exception_object, exception_traceback = sys.exc_info()
+    filename = os.path.split(exception_traceback.tb_frame.f_code.co_filename)[1]
+    try:
+        from pyUltroid.startup import LOGS
+    except ImportError:
+        print("IMPORT ERROR")
+
+    if full:
+        detailed_info = traceback.format_exception(
+            exception_type, exception_object, exception_traceback
+        )
+        detailed_info_str = "".join(detailed_info)
+        LOGS.info(
+            f"{exception_message}\n{detailed_info_str}\nFile: {filename}, Line {exception_traceback.tb_lineno}"
+        )
+    else:
+        LOGS.info(
+            f"{exception_message} {exception_type} {filename}, Line {exception_traceback.tb_lineno}"
+        )
 
 # ~~~~~~~~~~~~~~~~~~~~ small funcs ~~~~~~~~~~~~~~~~~~~~ #
 
@@ -97,8 +119,9 @@ def inline_mention(user, custom=None, html=False):
     return mention_text
 
 async def check_reply_to(event):
-    # Adding to this list will allow for anon or masked usermode
-    truai = [event.client.me.id]
+    U = ultroid_bot.uid
+    truai = [int(U)]
+
     if (event.is_private and event.is_reply) or (
         event.is_reply and event.reply_to_msg_id
     ):
@@ -117,8 +140,7 @@ async def check_reply_to(event):
             # If neither user_id nor channel_id is in truai, return False
             return False
         except Exception as e:
-            # Log the exception for debugging
-            print(f"Exception: {e}")
+            ErrInfo(e)
             return False
     return False
 
