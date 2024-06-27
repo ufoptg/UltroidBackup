@@ -20,6 +20,7 @@ from traceback import format_exc
 from subprocess import PIPE
 
 import requests
+from pydantic import BaseModel
 
 from .. import *
 from ..exceptions import DependencyMissingError
@@ -59,10 +60,24 @@ try:
     from bs4 import BeautifulSoup
 except ImportError:
     BeautifulSoup = None
-
+try:
+    if udB.get_key("GOOGLEAPI") and udB.get_key("MONGO_URI"):
+        GOOGLEAPI = udB.get_key("GOOGLEAPI")
+        chatbot_mongo = udB.get_key("MONGO_URI")
+    else:
+        raise ValueError("Missing required keys in the database, please set GOOGLEAPI and MONGO_URI for chatbot")
+except KeyError:
+    GOOGLEAPI = None
+    chatbot_mongo = None
+except ValueError:
+    GOOGLEAPI = None
+    chatbot_mongo = None
 # ~~~~~~~~~~~~~~~~~~~~OFOX API~~~~~~~~~~~~~~~~~~~~
 # @buddhhu
-
+if udB.get_key("GOOGLEAPI"):
+    GOOGLEAPI = udB.get_key("GOOGLEAPI")
+else:
+    GOOGLEAPI = None
 
 async def get_ofox(codename):
     ofox_baseurl = "https://api.orangefox.download/v3/"
@@ -485,18 +500,130 @@ async def get_google_images(query):
     return google_images
 
 
-# Thanks https://t.me/KukiUpdates/23 for ChatBotApi
+# --------------------------------------
 
+class ChatBot:
+    def __init__(
+        self,
+        query: str = None,
+    ):
+        self.query = query
+
+    async def get_response_gemini_oracle(
+        self,
+        api_key: str = None,
+        user_id: int = None,
+        mongo_url: str = str(chatbot_mongo),
+        re_json: bool = False,
+        is_login: bool = False,
+        is_multi_chat: bool = False,
+        is_gemini_oracle: bool = False,
+        gemini_api_key: str = None,
+    ):
+        url = f"https://ufoptg-ufop-api.hf.space/UFoP/gemini-the-oracle"
+        headers = {"accept": "application/json", "api-key": api_key}
+        params = {
+            "query": self.query,
+            "mongo_url": mongo_url,
+            "user_id": user_id,
+            "is_logon": is_login,
+            "is_multi_chat": is_multi_chat,
+            "gemini_api_key": gemini_api_key,
+        }
+
+        async def evaluate_response(response):
+            if response.status != 200:
+                return f"Error status: {response.status}"
+
+            if is_gemini_oracle:
+                if re_json:
+                    check_response = await response.json()
+                else:
+                    check_response = await response.text()
+                return check_response
+            else:
+                return f"WTF THIS {self.query}"
+
+        try:
+            response_data = await async_searcher(
+                url,
+                post=True,
+                headers=headers,
+                json=params,
+                evaluate=evaluate_response
+            )
+            return response_data
+        except aiohttp.ClientError as client_err:
+            return f"Error connecting to the server: {client_err}"
+
+# --------------------------------------
+# @TrueSaiyan
 
 async def get_chatbot_reply(message):
-    chatbot_base = "https://kuki-api-lac.vercel.app/message={}"
-    req_link = chatbot_base.format(
-        message,
-    )
+    if GOOGLEAPI is not None:
+        api_url = f"https://generativelanguage.googleapis.com/v1beta3/models/text-bison-001:generateText?key={GOOGLEAPI}"
+    else:
+        return "Sorry you need to set a GOOGLEAPI key to use this chatbot"
+
+    headers = {"Content-Type": "application/json"}
+    data = {"prompt": {"text": message}}
+
+    async def evaluate_response(response):
+        response_str = await response.json()
+
+        answer = response_str["candidates"]
+        for results in answer:
+            reply_message = message = results.get("output")
+        if reply_message is not None:
+            return reply_message
+        else:
+            LOGS.warning("Unexpected JSON format in the chatbot response.")
+            return "Unexpected response from the chatbot server."
+
     try:
-        return (await async_searcher(req_link, re_json=True)).get("reply")
-    except Exception:
-        LOGS.info(f"**ERROR:**`{format_exc()}`")
+        reply_message = await async_searcher(
+            api_url,
+            post=True,
+            headers=headers,
+            json=data,
+            evaluate=evaluate_response
+        )
+        return reply_message
+    except aiohttp.ClientError as client_err:
+        LOGS.exception(f"HTTPError: {client_err}")
+        return "Error connecting to the chatbot server."
+    except json.JSONDecodeError as json_err:
+        LOGS.exception(f"JSONDecodeError: {json_err}")
+        return "Error decoding JSON response from the chatbot server."
+    except Exception as e:
+        LOGS.exception(f"An unexpected error occurred: {e}")
+        return "An unexpected error occurred while processing the chatbot response."
+
+
+
+async def get_oracle_reply(query, user_id, mongo_url):
+    if not udB.get_key("MONGO_URI"):
+        return "You cannot use this without setting a MONGO_URI first"
+
+    response = await ChatBot(query).get_response_gemini_oracle(
+        api_key=GOOGLEAPI,
+        user_id=user_id,
+        mongo_url=mongo_url,
+        re_json=True,
+        is_multi_chat=True,
+        is_gemini_oracle=True,
+    )
+
+    get_response = response["randydev"].get("message") if response else None
+
+    if get_response is not None:
+        return get_response
+    else:
+        return "Unexpected response from the chatbot server."
+
+
+
+# -----------------------------------------------------------------------------------#
 
 def check_filename(filroid):
     if os.path.exists(filroid):
