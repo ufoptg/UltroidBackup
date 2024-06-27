@@ -119,6 +119,11 @@ def inline_mention(user, custom=None, html=False):
     return mention_text
 
 async def check_reply_to(event):
+    try:
+        from .. import ultroid_bot
+    except ImportError as er:
+        ErrInfo(er, full=True)
+        return False
     U = ultroid_bot.uid
     truai = [int(U)]
 
