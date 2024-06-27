@@ -5,9 +5,11 @@
 # PLease read the GNU Affero General Public License in
 # <https://github.com/TeamUltroid/pyUltroid/blob/main/LICENSE>.
 
+import asyncio
 import inspect
 import sys
 import time
+import random
 from logging import Logger
 
 from telethon import TelegramClient
@@ -17,11 +19,16 @@ from telethon.errors import (
     AccessTokenInvalidError,
     ApiIdInvalidError,
     AuthKeyDuplicatedError,
+    HistoryGetFailedError,  # Custom exception
+    PersistentTimestampOutdatedError  # Custom exception
 )
 
 from ..configs import Var
 from . import *
 
+
+def exponential_backoff(retry_count):
+    return min(60, (2 ** retry_count) + (random.randint(0, 1000) / 1000))
 
 class UltroidClient(TelegramClient):
     def __init__(
@@ -51,9 +58,7 @@ class UltroidClient(TelegramClient):
         self.dc_id = self.session.dc_id
 
     def __repr__(self):
-        return "<Ultroid.Client :\n self: {}\n bot: {}\n>".format(
-            self.full_name, self._bot
-        )
+        return f"<Ultroid.Client :\n self: {self.full_name}\n bot: {self._bot}\n>"
 
     @property
     def __dict__(self):
@@ -76,14 +81,11 @@ class UltroidClient(TelegramClient):
                 return sys.exit()
             self.logger.critical("String session expired.")
         except (AccessTokenExpiredError, AccessTokenInvalidError):
-            # AccessTokenError can only occur for Bot account
-            # And at Early Process, Its saved in DB.
             self.udB.del_key("BOT_TOKEN")
             self.logger.critical(
                 "Bot token is expired or invalid. Create new from @Botfather and add in BOT_TOKEN env variable!"
             )
             sys.exit()
-        # Save some stuff for later use...
         self.me = await self.get_me()
         if self.me.bot:
             me = f"@{self.me.username}"
@@ -93,6 +95,50 @@ class UltroidClient(TelegramClient):
         if self._log_at:
             self.logger.info(f"Logged in as {me}")
         self._bot = await self.is_bot()
+
+    async def get_channel_difference(self, chat_hashes):
+        entry = next((id for id in self.getting_diff_for if isinstance(id, int)), None)
+        if not entry:
+            return None
+
+        packed = chat_hashes.get(entry)
+        if not packed:
+            self.end_get_diff(entry)
+            self.map.pop(entry, None)
+            return None
+
+        state = self.map.get(entry)
+        if not state:
+            raise RuntimeError('Should not try to get difference for an entry without known state')
+
+        gd = fn.updates.GetChannelDifferenceRequest(
+            force=False,
+            channel=tl.InputChannel(packed.id, packed.hash),
+            filter=tl.ChannelMessagesFilterEmpty(),
+            pts=state.pts,
+            limit=BOT_CHANNEL_DIFF_LIMIT if chat_hashes.self_bot else USER_CHANNEL_DIFF_LIMIT
+        )
+        if __debug__:
+            self._trace('Requesting channel difference %s', gd)
+        return gd
+
+    async def fetch_channel_updates(self, chat_hashes):
+        retry_count = 0
+        max_retries = 5
+
+        while retry_count < max_retries:
+            try:
+                result = await self.get_channel_difference(chat_hashes)
+                if result:
+                    # Process the result if needed
+                    break
+            except (HistoryGetFailedError, PersistentTimestampOutdatedError, ValueError) as e:
+                self.logger.error(f"Error: {e}. Retrying...")
+                await asyncio.sleep(exponential_backoff(retry_count))
+                retry_count += 1
+
+        if retry_count == max_retries:
+            self.logger.warning("Max retries reached. Failed to get channel difference.")
 
     async def fast_uploader(self, file, **kwargs):
         """Upload files in a faster way"""
@@ -115,7 +161,7 @@ class UltroidClient(TelegramClient):
         by_bot = self._bot
         size = os.path.getsize(file)
         # Don't show progress bar when file size is less than 5MB.
-        if size < 5 * 2 ** 20:
+        if size < 5 * 2**20:
             show_progress = False
         if use_cache and self._cache and self._cache.get("upload_cache"):
             for files in self._cache["upload_cache"]:
@@ -142,12 +188,14 @@ class UltroidClient(TelegramClient):
                     file=f,
                     filename=filename,
                     progress_callback=(
-                        lambda completed, total: self.loop.create_task(
-                            progress(completed, total, event, start_time, message)
+                        (
+                            lambda completed, total: self.loop.create_task(
+                                progress(completed, total, event, start_time, message)
+                            )
                         )
-                    )
-                    if show_progress
-                    else None,
+                        if show_progress
+                        else None
+                    ),
                 )
         cache = {
             "by_bot": by_bot,
@@ -175,7 +223,7 @@ class UltroidClient(TelegramClient):
         if show_progress:
             event = kwargs["event"]
         # Don't show progress bar when file size is less than 10MB.
-        if file.size < 10 * 2 ** 20:
+        if file.size < 10 * 2**20:
             show_progress = False
         import mimetypes
 
@@ -208,12 +256,14 @@ class UltroidClient(TelegramClient):
                     location=file,
                     out=f,
                     progress_callback=(
-                        lambda completed, total: self.loop.create_task(
-                            progress(completed, total, event, start_time, message)
+                        (
+                            lambda completed, total: self.loop.create_task(
+                                progress(completed, total, event, start_time, message)
+                            )
                         )
-                    )
-                    if show_progress
-                    else None,
+                        if show_progress
+                        else None
+                    ),
                 )
         return raw_file, time.time() - start_time
 
