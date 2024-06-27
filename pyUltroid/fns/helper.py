@@ -119,13 +119,7 @@ def inline_mention(user, custom=None, html=False):
     return mention_text
 
 async def check_reply_to(event):
-    try:
-        from .. import ultroid_bot
-    except ImportError as er:
-        ErrInfo(er, full=True)
-        return False
-    U = ultroid_bot.uid
-    truai = [int(U)]
+    truai = [event.client.me.id]
 
     if (event.is_private and event.is_reply) or (
         event.is_reply and event.reply_to_msg_id
