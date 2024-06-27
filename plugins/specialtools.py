@@ -152,7 +152,7 @@ async def tfhoro(sign, day, token):
         return {"Error": "No response from server"}
 
 
-@nimbus_cmd(
+@ultroid_cmd(
     pattern=r"dob( (.*)|$)",
 )
 async def hbd(event):
