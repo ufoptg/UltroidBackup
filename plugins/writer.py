@@ -20,7 +20,7 @@ import os
 from htmlwebshot import WebShot
 from PIL import Image, ImageDraw, ImageFont
 
-from . import async_searcher, eod, get_pstring, get_string, ultroid_cmd, text_set
+from . import async_searcher, eod, get_string, ultroid_cmd, text_set
 
 
 @ultroid_cmd(pattern="gethtml( (.*)|$)")
@@ -67,7 +67,7 @@ async def writer(e):
         text = e.text.split(maxsplit=1)[1]
     else:
         return await eod(e, get_string("writer_1"))
-    k = await e.eor(get_pstring("com_1", "load"))
+    k = await e.eor(get_string("com_1")
     img = Image.open("resources/extras/template.jpg")
     draw = ImageDraw.Draw(img)
     font = ImageFont.truetype("resources/fonts/assfont.ttf", 30)
