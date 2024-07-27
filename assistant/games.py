@@ -74,6 +74,10 @@ async def okah(e):
     try:
         gm = games[ch][mid]
         await gm.answer(ans)
+        
+        if gm.progression is None:
+            gm.progression = 0
+        
         if gm.progression >= 80:
             gm.win = True
             text = f"It's {gm.name_proposition}\n{gm.description_proposition}"
