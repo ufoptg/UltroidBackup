@@ -17,7 +17,8 @@ import asyncio
 import re
 from telethon.errors.rpcerrorlist import BotMethodInvalidError
 from telethon.events import Raw
-from telethon.tl.types import InputMediaPoll, Poll, PollAnswer, UpdateMessagePollVote
+from telethon.tl.types import InputMediaPoll, Poll, PollAnswer, UpdateMessagePollVote, InputMessageID
+from telethon.tl.functions.messages import GetMessagesRequest
 from pyUltroid._misc._decorators import ultroid_cmd
 from pyUltroid.fns.helper import inline_mention
 from pyUltroid.fns.tools import async_searcher
@@ -31,16 +32,19 @@ aki_photo = "https://graph.org/file/3cc8825c029fd0cab9edc.jpg"
 async def akina(e):
     sta = Akinator()
     games[e.chat_id] = {e.id: sta}
+    LOGS.info(f"Game started for chat {e.chat_id} with ID {e.id}.")
     try:
         m = await e.client.inline_query(asst.me.username, f"aki_{e.chat_id}_{e.id}")
         await m[0].click(e.chat_id)
-    except BotMethodInvalidError:
+    except BotMethodInvalidError as err:
+        LOGS.error(f"BotMethodInvalidError: {err}")
         await asst.send_file(
             e.chat_id,
             aki_photo,
             buttons=Button.inline(get_string("aki_2"), data=f"aki_{e.chat_id}_{e.id}"),
         )
     except Exception as er:
+        LOGS.error(f"Unexpected error: {er}")
         return await e.eor(f"ERROR : {er}")
     if e.out:
         await e.delete()
@@ -67,28 +71,43 @@ async def doai(e):
 
 @callback(re.compile("aka_(.*)"), owner=True)
 async def okah(e):
-    mk = e.pattern_match.group(1).decode("utf-8").split("_")
-    ch = int(mk[0])
-    mid = int(mk[1])
-    ans = mk[2]
     try:
+        mk = e.pattern_match.group(1).decode("utf-8").split("_")
+        LOGS.info(f"Parsed values: {mk}")
+
+        if len(mk) < 3:
+            LOGS.error("Pattern match did not return enough parts.")
+            return await e.answer("Invalid data received.", alert=True)
+
+        ch = int(mk[0])
+        mid = int(mk[1])
+        ans = mk[2]
+
         gm = games[ch][mid]
         await gm.answer(ans)
-        
+
         if gm.progression is None:
             gm.progression = 0
-        
-        if gm.progression >= 80:
+
+        if int(float(gm.progression)) >= 80:
             gm.win = True
-            text = f"It's {gm.name_proposition}\n{gm.description_proposition}"
-            return await e.edit(text, file=gm.photo)
+            if int(gm.step) > 3:
+                text = f"It's {gm.name_proposition}\n{gm.description_proposition}"
+            else:
+                text = f"Ha, You cant fool me!"
+            await e.edit(text, file=gm.photo)
         else:
-            bts = [Button.inline(o, f"aka_{ch}_{mid}_{o}") for o in ["Yes", "No", "Idk"]]
-            cts = [Button.inline(o, f"aka_{ch}_{mid}_{o}") for o in ["Probably", "Probably Not"]]
-            bts = [bts, cts]
-            await e.edit(gm.question, buttons=bts)
+            buttons = [
+                [Button.inline(o, f"aka_{ch}_{mid}_{o}") for o in ["Yes", "No", "Idk"]],
+                [Button.inline(o, f"aka_{ch}_{mid}_{o}") for o in ["Probably", "Probably Not"]]
+            ]
+            await e.edit(gm.question, buttons=buttons)
+
     except KeyError:
         await e.answer(get_string("aki_3"))
+    except Exception as ex:
+        LOGS.error(f"An unexpected error occurred: {ex}")
+
 
 @in_pattern(re.compile("aki_?(.*)"), owner=True)
 async def eiagx(e):
