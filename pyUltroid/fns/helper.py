@@ -663,3 +663,11 @@ async def shutdown(ult):
             )
     else:
         sys.exit()
+
+
+# ------------------User Extraction----------------#
+
+
+async def extract_user(message: Message, args: List[str]) -> Optional[int]:
+    prev_message = await message.get_reply_message()
+    return prev_message.sender_id if prev_message else None
