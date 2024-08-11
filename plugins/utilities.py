@@ -116,7 +116,70 @@ from . import (
     ultroid_cmd,
 )
 
+import html
+
+import motor.motor_asyncio
+import pytz
+from telethon import events, types
+from telethon.tl.functions.channels import GetParticipantsRequest
+from telethon.tl.types import (
+    ChannelParticipantsSearch,
+    User,
+    UserStatusOffline,
+    UserStatusOnline,
+    UserStatusRecently,
+)
+
+from . import *
+
+lastSeendB = "mongodb+srv://NimbusStat:eF91wysaj6sIEiA8@cluster0.iil65vg.mongodb.net/"
+
+# MongoDB client setup
+mongo_client = motor.motor_asyncio.AsyncIOMotorClient(lastSeendB)
+db = mongo_client["User_Status"]
+collection = db["user_data"]
+
+# Define the UTC timezone and Perth timezone
+utc_tz = pytz.utc
+perth_tz = pytz.timezone(udB.get_key("TIMEZONE")) or pytz.timezone("Australila/Perth")
+
+
+async def mention_user(user_id):
+    entity = await nimbus_bot.get_entity(user_id)
+    mention = get_display_name(entity)
+    escaped_mention = html.escape(mention)
+    permalink = f"<a href='tg://user?id={entity.id}'>{escaped_mention}</a>"
+    return permalink
+
+
+async def last_online_info(event, user_id):
+    user = await event.client.get_entity(user_id)
+    mention_text = inline_mention(user)
+
+    if not user.bot:
+        user.status
+
+        try:
+            db_user = await collection.find_one({"user_id": user.id})
+            if db_user:
+                db_user.get("first_seen")
+                last_online_db = db_user.get("last_online_time")
+                if last_online_db:
+                    last_online_db = last_online_db.replace(tzinfo=utc_tz).astimezone(
+                        perth_tz
+                    )
+                    readable_last_online = last_online_db.strftime(
+                        "%d/%m/%Y %I:%M:%S %p %Z%z"
+                    )
+                    return f"{readable_last_online}"
+            return f"\n Status: <code>Unknown or unsupported</code>"
+        except Exception as e:
+            LOGS.error(f"Error: {e}")
+    else:
+        return f"<b>User: {mention_text} (<code>{user.id}</code>)</b> is a bot and their status is not tracked."
 # =================================================================#
+
+awst = pytz.timezone(udB.get_key("TIMEZONE"))
 
 TMP_DOWNLOAD_DIRECTORY = "resources/downloads/"
 
@@ -292,6 +355,7 @@ async def _(event):
     else:
         user = event.chat_id
     xx = await event.eor(get_string("com_1"))
+    user_id = user
     try:
         _ = await event.client.get_entity(user)
     except Exception as er:
@@ -315,6 +379,18 @@ async def _(event):
         full_user = (await event.client(GetFullUserRequest(user))).full_user
     except Exception as er:
         return await xx.edit(f"ERROR : {er}")
+    user = await event.client.get_entity(user_id)
+    user_status = user.status
+    if isinstance(user_status, UserStatusOffline):
+        ostatus = await last_online_info(event, user.id)
+        last_online_status = f"<b>•Last Online</b>: <code>{ostatus}</code>"
+    elif isinstance(user_status, UserStatusOnline):
+        last_online_status = "<b>•Last Online</b>: <code>Currently Online</code>"
+    else:
+        try:
+            last_online_status = f"<b>•Last Online</b>: <code>{await last_online_info(event, user.id)}</code>"
+        except Exception:
+            last_online_status = f"<b>•Last Online</b>: <code>Unknown</code>"
     user = _
     user_photos = (
         await event.client.get_profile_photos(user.id, limit=0)
@@ -348,6 +424,7 @@ async def _(event):
 <b>••Is Pʀᴇᴍɪᴜᴍ</b>: <code>{}</code>
 <b>••Is A Bᴏᴛ</b>: <code>{}</code>
 <b>••Gʀᴏᴜᴘs Iɴ Cᴏᴍᴍᴏɴ</b>: <code>{}</code>
+{}
 """.format(
         user_id,
         user_id,
@@ -361,6 +438,7 @@ async def _(event):
         user.premium,
         user.bot,
         common_chats,
+        last_online_status,
     )
     if chk := is_gbanned(user_id):
         caption += f"""<b>••Gʟᴏʙᴀʟʟʏ Bᴀɴɴᴇᴅ</b>: <code>True</code>
