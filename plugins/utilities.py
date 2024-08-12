@@ -141,7 +141,7 @@ collection = db["user_data"]
 
 # Define the UTC timezone and Perth timezone
 utc_tz = pytz.utc
-perth_tz = pytz.timezone("India/Mumbai")
+perth_tz = pytz.timezone("Australia/Perth")
 
 
 async def mention_user(user_id):
