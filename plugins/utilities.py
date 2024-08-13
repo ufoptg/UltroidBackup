@@ -179,7 +179,7 @@ async def last_online_info(event, user_id):
         return f"<b>User: {mention_text} (<code>{user.id}</code>)</b> is a bot and their status is not tracked."
 # =================================================================#
 
-awst = pytz.timezone(udB.get_key("TIMEZONE"))
+awst = pytz.timezone("Asia/Kolkata")
 
 TMP_DOWNLOAD_DIRECTORY = "resources/downloads/"
 
