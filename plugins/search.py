@@ -110,6 +110,8 @@ async def google(event):
 @ultroid_cmd(pattern="img( (.*)|$)")
 async def goimg(event):
     query = event.pattern_match.group(1).strip()
+    if not udB.get_key("SERPAPI"):
+        return await event.eor("Error: SERPAPI not set please set a SERP API")
     if not query:
         return await event.eor(get_string("autopic_1"))
     nn = await event.eor(get_string("com_1"))
