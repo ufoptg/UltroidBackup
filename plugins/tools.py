@@ -96,11 +96,19 @@ async def _(event):
         text = txt
     elif event.is_reply:
         previous_message = await event.get_reply_message()
-        text = previous_message.message
+
+        if previous_message.media and hasattr(previous_message.media, 'poll'):
+            poll = previous_message.media.poll
+            question_text = poll.question.text
+            answers_text = "\n".join([f"- {answer.text.text}" for answer in poll.answers])
+            text = f"Poll Question:\n{question_text}\n\nPoll Answers:\n{answers_text}"
+        else:
+            text = previous_message.message
     else:
         return await eor(
             event, f"`{HNDLR}tl LanguageCode` as reply to a message", time=5
         )
+
     lan = input_ or "en"
     try:
         tt = await previous_message.translate(lan)
