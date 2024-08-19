@@ -177,6 +177,7 @@ _buttons = {
             [Button.inline("Remove.bg API", data="abs_rmbg")],
             [Button.inline("DEEP API", data="abs_dapi")],
             [Button.inline("OCR API", data="abs_oapi")],
+            [Button.inline("SERP API", data="abs_sapi")],
             [Button.inline("« Back", data="setter")],
         ],
     },
@@ -199,6 +200,12 @@ _convo = {
         "var": "OCR_API",
         "name": "Ocr Api Key",
         "text": "Get Your OCR api from ocr.space and send that Here.",
+        "back": "cbs_apiset",
+    },
+    "sapi": {
+        "var": "SERPAPI",
+        "name": "Serp Api Key",
+        "text": "Get Your SERP api from https://serpapi.com/users/sign_in and send that Here.",
         "back": "cbs_apiset",
     },
     "pmlgg": {
