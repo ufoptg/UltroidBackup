@@ -198,7 +198,7 @@ async def _(e):
         try:
             bbbb = await reply.download_media(thumb=-1)
         except TypeError:
-            bbbb = NIMConfig.thumb
+            bbbb = ULTConfig.thumb
         im = cv2.imread(bbbb)
         dsize = (512, 512)
         output = cv2.resize(im, dsize, interpolation=cv2.INTER_AREA)
@@ -241,7 +241,7 @@ async def _(e):
                 e.chat_id,
                 file,
                 video_note=True,
-                thumb=NIMConfig.thumb,
+                thumb=ULTConfig.thumb,
                 reply_to=reply,
             )
             os.remove(file)
@@ -342,7 +342,7 @@ async def _(e):
     except MessageTooLongError:
         with io.BytesIO(str.encode(text)) as out_file:
             out_file.name = "output.txt"
-            await e.reply(f"`{e.text}`", file=out_file, thumb=NIMConfig.thumb)
+            await e.reply(f"`{e.text}`", file=out_file, thumb=ULTConfig.thumb)
         await e.delete()
 
 
