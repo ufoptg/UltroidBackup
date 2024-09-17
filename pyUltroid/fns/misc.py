@@ -13,6 +13,7 @@ import string
 from logging import WARNING
 from random import choice, randrange, shuffle
 from traceback import format_exc
+import requests
 
 from pyUltroid.exceptions import DependencyMissingError
 
@@ -266,6 +267,57 @@ async def get_synonyms_or_antonyms(word, type_of_words):
         for y in x
     ]
     return [y["term"] for y in li_1]
+
+#Catbox Uploader
+
+class CatboxError(Exception):
+    """Base exception for Catbox errors."""
+    pass
+
+def upload_file(file_path_or_bytes, timeout=30, userhash=None):
+    """
+    Upload file to Catbox. Supports both file paths and BytesIO objects.
+    
+    :param file_path_or_bytes: Path to the file to upload or a BytesIO object.
+    :param timeout: Timeout in seconds for the upload request.
+    :param userhash: Optional userhash for authenticated upload.
+    :return: URL of the uploaded file on Catbox.
+    """
+    try:
+        if isinstance(file_path_or_bytes, str):
+            files = {'fileToUpload': open(file_path_or_bytes, 'rb')}
+        else:
+            raise CatboxError("Only file paths are supported in this version.")
+
+        data = {'reqtype': 'fileupload'}
+        if userhash:
+            data['userhash'] = userhash
+
+        response = requests.post("https://catbox.moe/user/api.php", files=files, data=data, timeout=timeout)
+
+        if response.status_code != 200 or not response.text:
+            raise CatboxError("Failed to upload file to Catbox.")
+        
+        return response.text.strip()
+
+    except exception as er:
+        LOGS.info(f"Error: {er}")
+    finally:
+        if isinstance(file_path_or_bytes, str):
+            files['fileToUpload'].close()
+
+
+class CatboxUploader:
+    def __init__(self, userhash=None):
+        """
+        Initialize CatboxUploader with optional userhash (similar to API key).
+        
+        :param userhash: A string containing the userhash for authenticated uploads and album management.
+        """
+        self.userhash = userhash
+    
+    def upload_file(self, file_path, timeout=30):
+        return upload_file(file_path, timeout, self.userhash)
 
 
 # Quotly
