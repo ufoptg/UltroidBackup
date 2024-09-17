@@ -18,7 +18,7 @@ import os
 import time
 from datetime import datetime as dt
 
-from pyUltroid.fns.misc import rotate_image
+from pyUltroid.fns.misc import rotate_image, CatboxUploader
 from pyUltroid.fns.tools import make_html_telegraph
 
 from . import (
@@ -38,6 +38,7 @@ except ImportError:
     LOGS.info("WARNING: 'cv2' not found!")
     cv2 = None
 
+uploader = CatboxUploader(userhash="")
 
 @ultroid_cmd(pattern="mediainfo( (.*)|$)")
 async def mi(e):
@@ -54,9 +55,9 @@ async def mi(e):
 
         if hasattr(r.media, "document"):
             file = r.media.document
-            mime_type = file.mime_type
             filename = r.file.name
             if not filename:
+                mime_type = file.mime_type
                 if "audio" in mime_type:
                     filename = "audio_" + dt.now().isoformat("_", "seconds") + ".ogg"
                 elif "video" in mime_type:
@@ -87,7 +88,8 @@ async def mi(e):
     makehtml = ""
     if naam.endswith((".jpg", ".png")):
         if os.path.exists(naam):
-            med = "https://graph.org" + Telegraph.upload_file(naam)[0]["src"]
+            #med = "https://graph.org" + Telegraph.upload_file(naam)[0]["src"]
+            med = uploader.upload_file(naam, timeout=10)
         else:
             med = match
         makehtml += f"<img src='{med}'><br>"
