@@ -17,6 +17,7 @@ from telethon import events
 
 from pyUltroid.dB.afk_db import add_afk, del_afk, is_afk
 from pyUltroid.dB.base import KeyManager
+from pyUltroid.fns.misc import CatboxUploader
 
 from . import (
     LOG_CHANNEL,
@@ -34,6 +35,8 @@ old_afk_msg = []
 
 is_approved = KeyManager("PMPERMIT", cast=list).contains
 
+uploader = CatboxUploader(userhash="")
+
 
 @ultroid_cmd(pattern="afk( (.*)|$)", owner_only=True)
 async def set_afk(event):
@@ -50,8 +53,8 @@ async def set_afk(event):
             media_type = mediainfo(reply.media)
             if media_type.startswith(("pic", "gif")):
                 file = await event.client.download_media(reply.media)
-                iurl = uf(file)
-                media = f"https://graph.org{iurl[0]}"
+                iurl = uploader.upload_file(naam, timeout=10)
+                media = iurl
             else:
                 media = reply.file.id
     await event.eor("`Done`", time=2)
