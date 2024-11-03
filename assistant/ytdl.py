@@ -4,6 +4,7 @@
 # This file is a part of < https://github.com/TeamUltroid/Ultroid/ >
 # PLease read the GNU Affero General Public License in
 # <https://www.github.com/TeamUltroid/Ultroid/blob/main/LICENSE/>.
+#Modifed for cookies and fixed by @TrueSaiyan
 
 
 import os
@@ -136,7 +137,6 @@ async def _(e):
         if _buttons
         else "`Error downloading from YouTube.\nTry Restarting your bot.`"
     )
-
     await e.edit(_text, buttons=_buttons)
 
 
@@ -156,6 +156,8 @@ async def _(event):
         ext = lets_split[3]
     except IndexError:
         ext = "mp3"
+    
+    # Define download options based on audio or video type
     if lets_split[0] == "audio":
         opts = {
             "format": "bestaudio",
@@ -173,31 +175,33 @@ async def _(event):
                 },
                 {"key": "FFmpegMetadata"},
             ],
+            "cookiefile": "cookies.txt",
         }
 
         ytdl_data = await dler(event, link, opts, True)
         title = ytdl_data["title"]
-        if ytdl_data.get("artist"):
-            artist = ytdl_data["artist"]
-        elif ytdl_data.get("creator"):
-            artist = ytdl_data["creator"]
-        elif ytdl_data.get("channel"):
-            artist = ytdl_data["channel"]
+        artist = ytdl_data.get("artist") or ytdl_data.get("creator") or ytdl_data.get("channel")
         views = numerize(ytdl_data.get("view_count")) or 0
         thumb, _ = await fast_download(ytdl_data["thumbnail"], filename=f"{vid_id}.jpg")
 
         likes = numerize(ytdl_data.get("like_count")) or 0
         duration = ytdl_data.get("duration") or 0
         description = (
-            ytdl_data["description"]
-            if len(ytdl_data["description"]) < 100
-            else ytdl_data["description"][:100]
+            ytdl_data["description"][:100]
+            if ytdl_data["description"] and len(ytdl_data["description"]) >= 100
+            else ytdl_data.get("description", "None")
         )
-        description = description or "None"
+        
         filepath = f"{vid_id}.{ext}"
         if not os.path.exists(filepath):
             filepath = f"{filepath}.{ext}"
-        size = os.path.getsize(filepath)
+        if os.path.exists(filepath):
+            size = os.path.getsize(filepath)
+        else:
+            LOGS.error(f"File not found: {filepath}")
+            await event.edit("`Error: File not found after download.`")
+            return
+
         file, _ = await event.client.fast_uploader(
             filepath,
             filename=f"{title}.{ext}",
@@ -213,6 +217,7 @@ async def _(event):
                 performer=artist,
             ),
         ]
+
     elif lets_split[0] == "video":
         opts = {
             "format": str(format),
@@ -223,36 +228,47 @@ async def _(event):
             "outtmpl": f"%(id)s.{ext}",
             "logtostderr": False,
             "postprocessors": [{"key": "FFmpegMetadata"}],
+            "cookiefile": "cookies.txt",
         }
 
         ytdl_data = await dler(event, link, opts, True)
         title = ytdl_data["title"]
-        if ytdl_data.get("artist"):
-            artist = ytdl_data["artist"]
-        elif ytdl_data.get("creator"):
-            artist = ytdl_data["creator"]
-        elif ytdl_data.get("channel"):
-            artist = ytdl_data["channel"]
+        artist = ytdl_data.get("artist") or ytdl_data.get("creator") or ytdl_data.get("channel")
         views = numerize(ytdl_data.get("view_count")) or 0
         thumb, _ = await fast_download(ytdl_data["thumbnail"], filename=f"{vid_id}.jpg")
+        description = (
+            ytdl_data.get("description", "None")
+            if ytdl_data.get("description") and len(ytdl_data["description"]) < 100
+            else (ytdl_data["description"][:100] if ytdl_data.get("description") else "None")
+        )
 
         try:
             Image.open(thumb).save(thumb, "JPEG")
         except Exception as er:
             LOGS.exception(er)
             thumb = None
-        description = (
-            ytdl_data["description"]
-            if len(ytdl_data["description"]) < 100
-            else ytdl_data["description"][:100]
-        )
+
         likes = numerize(ytdl_data.get("like_count")) or 0
         hi, wi = ytdl_data.get("height") or 720, ytdl_data.get("width") or 1280
         duration = ytdl_data.get("duration") or 0
         filepath = f"{vid_id}.mkv"
         if not os.path.exists(filepath):
             filepath = f"{filepath}.webm"
-        size = os.path.getsize(filepath)
+        if os.path.exists(filepath):
+            size = os.path.getsize(filepath)
+        if not os.path.exists(filepath):
+            filepath = f"{vid_id}.mp4.webm"
+        if os.path.exists(filepath):
+            size = os.path.getsize(filepath)
+        if not os.path.exists(filepath):
+            filepath = f"{vid_id}.mp4.mkv"
+        if os.path.exists(filepath):
+            size = os.path.getsize(filepath)
+        else:
+            LOGS.error(f"File not found: {filepath}")
+            await event.edit("`Error: File not found after download.`")
+            return
+
         file, _ = await event.client.fast_uploader(
             filepath,
             filename=f"{title}.mkv",
@@ -269,6 +285,7 @@ async def _(event):
                 supports_streaming=True,
             ),
         ]
+
     description = description if description != "" else "None"
     text = f"**Title: [{title}]({_yt_base_url}{vid_id})**\n\n"
     text += f"`📝 Description: {description}\n\n"
@@ -278,6 +295,7 @@ async def _(event):
     text += f"「 Likes: {likes} 」\n"
     text += f"「 Size: {humanbytes(size)} 」`"
     button = Button.switch_inline("Search More", query="yt ", same_peer=True)
+
     try:
         await event.edit(
             text,
@@ -296,6 +314,7 @@ async def _(event):
             thumb=thumb,
         )
         await event.edit(text, file=file.media, buttons=button)
+
     await bash(f"rm {vid_id}.jpg")
 
 
