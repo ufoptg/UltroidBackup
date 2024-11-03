@@ -4,6 +4,7 @@
 # This file is a part of < https://github.com/TeamUltroid/Ultroid/ >
 # PLease read the GNU Affero General Public License in
 # <https://github.com/TeamUltroid/pyUltroid/blob/main/LICENSE>.
+#Modifed for cookies and fixed by @TrueSaiyan
 
 import glob
 import os
@@ -55,6 +56,7 @@ async def download_yt(event, link, ytd):
     info = await dler(event, link, ytd, download=True)
     if not info:
         return
+
     if info.get("_type", None) == "playlist":
         total = info["playlist_count"]
         for num, file in enumerate(info["entries"]):
@@ -65,38 +67,38 @@ async def download_yt(event, link, ytd):
             await download_file(
                 file.get("thumbnail", None) or file["thumbnails"][-1]["url"], thumb
             )
-            ext = "." + ytd["outtmpl"]["default"].split(".")[-1]
-            if ext == ".m4a":
-                ext = ".mp3"
-            id = None
+
+            # Find the downloaded file
+            downloaded_file = None
             for x in glob.glob(f"{id_}*"):
-                if not x.endswith("jpg"):
-                    id = x
-            if not id:
+                if not x.endswith(".jpg") and not x.endswith(".part"):
+                    downloaded_file = x
+                    break
+            if not downloaded_file:
                 return
-            ext = "." + id.split(".")[-1]
-            file = title + ext
+
+            # Extract the existing extension
+            existing_ext = os.path.splitext(downloaded_file)[-1]
+
+            file_renamed = title + existing_ext
+
             try:
-                os.rename(id, file)
+                os.rename(downloaded_file, file_renamed)
             except FileNotFoundError:
-                try:
-                    os.rename(id + ext, file)
-                except FileNotFoundError as er:
-                    if os.path.exists(id):
-                        file = id
-                    else:
-                        raise er
-            if file.endswith(".part"):
-                os.remove(file)
+                os.rename(downloaded_file + existing_ext, file_renamed)
+
+            if file_renamed.endswith(".part"):
+                os.remove(file_renamed)
                 os.remove(thumb)
                 await event.client.send_message(
                     event.chat_id,
                     f"`[{num}/{total}]` `Invalid Video format.\nIgnoring that...`",
                 )
-                return
-            attributes = await set_attributes(file)
+                continue  # Skip to next file in the playlist
+
+            attributes = await set_attributes(file_renamed)
             res, _ = await event.client.fast_uploader(
-                file, show_progress=True, event=event, to_delete=True
+                file_renamed, show_progress=True, event=event, to_delete=True
             )
             from_ = info["extractor"].split(":")[0]
             caption = f"`[{num}/{total}]` `{title}`\n\n`from {from_}`"
@@ -110,40 +112,47 @@ async def download_yt(event, link, ytd):
                 reply_to=reply_to,
             )
             os.remove(thumb)
+
         try:
             await event.delete()
         except BaseException:
             pass
         return
+
+    # Handle single video download
     title = info["title"]
     if len(title) > 20:
         title = title[:17] + "..."
+
     id_ = info["id"]
     thumb = id_ + ".jpg"
     await download_file(
         info.get("thumbnail", None) or f"https://i.ytimg.com/vi/{id_}/hqdefault.jpg",
         thumb,
     )
-    ext = "." + ytd["outtmpl"]["default"].split(".")[-1]
-    for _ext in [".m4a", ".mp3", ".opus"]:
-        if ext == _ext:
-            ext = _ext
-            break
-    id = None
+
+    # Find the downloaded file
+    downloaded_file = None
     for x in glob.glob(f"{id_}*"):
-        if not x.endswith("jpg"):
-            id = x
-    if not id:
+        if not x.endswith(".jpg") and not x.endswith(".part"):
+            downloaded_file = x
+            break
+    if not downloaded_file:
         return
-    ext = "." + id.split(".")[-1]
-    file = title + ext
+
+
+    existing_ext = os.path.splitext(downloaded_file)[-1]
+
+    file_renamed = title + existing_ext
+
     try:
-        os.rename(id, file)
+        os.rename(downloaded_file, file_renamed)
     except FileNotFoundError:
-        os.rename(id + ext, file)
-    attributes = await set_attributes(file)
+        os.rename(downloaded_file + existing_ext, file_renamed)
+
+    attributes = await set_attributes(file_renamed)
     res, _ = await event.client.fast_uploader(
-        file, show_progress=True, event=event, to_delete=True
+        file_renamed, show_progress=True, event=event, to_delete=True
     )
     caption = f"`{info['title']}`"
     await event.client.send_file(
@@ -162,8 +171,9 @@ async def download_yt(event, link, ytd):
         pass
 
 
+
 # ---------------YouTube Downloader Inline---------------
-# @New-Dev0 @buddhhu @1danish-00
+# @New-Dev0 @buddhhu @1danish-00 @TrueSaiyan
 
 
 def get_formats(type, id, data):
@@ -211,6 +221,17 @@ def get_formats(type, id, data):
 
 def get_buttons(listt):
     id = listt[0]["ytid"]
+
+    unique_resolutions = {}
+    for x in listt:
+        resolution = x['quality']
+        size = x.get('size', 0)
+        if (
+            resolution not in unique_resolutions 
+            or size > unique_resolutions[resolution].get('size', 0)
+        ):
+            unique_resolutions[resolution] = x
+
     butts = [
         Button.inline(
             text=f"[{x['quality']}"
@@ -218,12 +239,15 @@ def get_buttons(listt):
             data=f"ytdownload:{x['type']}:{x['id']}:{x['ytid']}"
             + (f":{x['ext']}" if x.get("ext") else ""),
         )
-        for x in listt
+        for x in unique_resolutions.values()
     ]
+
     buttons = list(zip(butts[::2], butts[1::2]))
     if len(butts) % 2 == 1:
         buttons.append((butts[-1],))
+
     buttons.append([Button.inline("« Back", f"ytdl_back:{id}")])
+    
     return buttons
 
 
@@ -233,6 +257,7 @@ async def dler(event, url, opts: dict = {}, download=False):
         opts["quiet"] = True
     opts["username"] = udB.get_key("YT_USERNAME")
     opts["password"] = udB.get_key("YT_PASSWORD")
+    opts["cookiefile"] = "cookies.txt"
     if download:
         await ytdownload(url, opts)
     try:
@@ -267,3 +292,4 @@ def get_videos_link(url):
         link = re.search(r"\?v=([(\w+)\-]*)", vid["link"]).group(1)
         to_return.append(f"https://youtube.com/watch?v={link}")
     return to_return
+
