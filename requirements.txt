@@ -5,3 +5,5 @@ python-decouple
 python-dotenv
 pyshorteners
 google-search-results
+motor
+pydantic
