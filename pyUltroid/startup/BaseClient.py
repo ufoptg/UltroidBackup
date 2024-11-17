@@ -180,21 +180,23 @@ class UltroidClient(TelegramClient):
         from pyUltroid.fns.FastTelethon import upload_file
         from pyUltroid.fns.helper import progress
 
-        async with aiofiles.open(file, "rb") as f:
-            raw_file = await upload_file(
-                client=self,
-                file=f,
-                filename=filename,
-                progress_callback=(
-                    (
-                        lambda completed, total: self.loop.create_task(
-                            progress(completed, total, event, start_time, message)
+        raw_file = None
+        while not raw_file:
+            with open(file, "rb") as f:
+                raw_file = await upload_file(
+                    client=self,
+                    file=f,
+                    filename=filename,
+                    progress_callback=(
+                        (
+                            lambda completed, total: self.loop.create_task(
+                                progress(completed, total, event, start_time, message)
+                            )
                         )
-                    )
-                    if show_progress
-                    else None
-                ),
-            )
+                        if show_progress
+                        else None
+                    ),
+                )
         cache = {
             "by_bot": by_bot,
             "size": size,
