@@ -355,14 +355,14 @@ async def sangmata(event):
     cmd = event.pattern_match.group(1)
     user = event.pattern_match.group(2)
     reply = await event.get_reply_message()
+    loading = await event.eor("`Processing...`")
     if not user and reply:
         user = str(reply.sender_id)
     if not user:
-        await event.edit(
+        return await loading.eor(
             "`Reply to  user's text message to get name/username history or give userid/username`",
+            time=10,
         )
-        await asyncio.sleep(10)
-        return await event.delete()
 
     try:
         if user.isdigit():
@@ -372,11 +372,8 @@ async def sangmata(event):
     except ValueError:
         userinfo = None
     if not isinstance(userinfo, types.User):
-        await event.edit("`Can't fetch the user...`")
-        await asyncio.sleep(10)
-        return await event.delete()
+        return await loading.eor("`Can't fetch the user...`", time=10)
 
-    await event.edit("`Processing...`")
     async with event.client.conversation("@SangMata_beta_bot") as conv:
         try:
             await conv.send_message(f"{userinfo.id}")
@@ -393,15 +390,19 @@ async def sangmata(event):
         await event.client.send_read_acknowledge(conv.chat_id)
 
     if not responses:
-        await event.edit("`Bot can't fetch results`")
-        await asyncio.sleep(10)
-        await event.delete()
-    if "No records found" in responses or "No data available" in responses:
-        await event.edit("`The user doesn't have any record`")
-        await asyncio.sleep(10)
-        await event.delete()
+        return await loading.eor("`Bot can't fetch results`", time=10)
+    elif "No records found" in responses or "No data available" in responses:
+        return await loading.eor("`The user doesn't have any record`", time=10)
+    elif "quota" in responses:
+        return await loading.eor("`Sangmata quota reached consider paying 5$ for unlimited`", time=10)
+    else:
+        return await loading.eor("`Possible quota may have been reached`", time=10)
 
-    names, usernames = sanga_seperator(responses)
+    try:
+        names, usernames = sanga_seperator(responses)
+    except ValueError as er:
+        return er
+
     check = (usernames, "Username") if cmd == "u" else (names, "Name")
     user_name = (
         f"{userinfo.first_name} {userinfo.last_name}"
@@ -409,7 +410,7 @@ async def sangmata(event):
         else userinfo.first_name
     )
     output = f"**➜ User Info :**  {mentionuser(user_name, userinfo.id)}\n**➜ {check[1]} History :**\n{check[0]}"
-    await event.edit(output)
+    await event.eor(output)
 
 
 @ultroid_cmd(pattern="webshot( (.*)|$)")
