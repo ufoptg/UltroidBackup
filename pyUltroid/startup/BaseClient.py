@@ -6,11 +6,14 @@
 # <https://github.com/TeamUltroid/pyUltroid/blob/main/LICENSE>.
 
 import asyncio
+import aiofiles
 import inspect
+import os
 import sys
 import time
 import random
 from logging import Logger
+from pathlib import Path
 
 from telethon import TelegramClient
 from telethon import utils as telethon_utils
@@ -143,9 +146,6 @@ class UltroidClient(TelegramClient):
     async def fast_uploader(self, file, **kwargs):
         """Upload files in a faster way"""
 
-        import os
-        from pathlib import Path
-
         start_time = time.time()
         path = Path(file)
         filename = kwargs.get("filename", path.name)
@@ -180,23 +180,21 @@ class UltroidClient(TelegramClient):
         from pyUltroid.fns.FastTelethon import upload_file
         from pyUltroid.fns.helper import progress
 
-        raw_file = None
-        while not raw_file:
-            with open(file, "rb") as f:
-                raw_file = await upload_file(
-                    client=self,
-                    file=f,
-                    filename=filename,
-                    progress_callback=(
-                        (
-                            lambda completed, total: self.loop.create_task(
-                                progress(completed, total, event, start_time, message)
-                            )
+        async with aiofiles.open(file, "rb") as f:
+            raw_file = await upload_file(
+                client=self,
+                file=f,
+                filename=filename,
+                progress_callback=(
+                    (
+                        lambda completed, total: self.loop.create_task(
+                            progress(completed, total, event, start_time, message)
                         )
-                        if show_progress
-                        else None
-                    ),
-                )
+                    )
+                    if show_progress
+                    else None
+                ),
+            )
         cache = {
             "by_bot": by_bot,
             "size": size,
@@ -248,23 +246,21 @@ class UltroidClient(TelegramClient):
                 )
         message = kwargs.get("message", f"Downloading {filename}...")
 
-        raw_file = None
-        while not raw_file:
-            with open(filename, "wb") as f:
-                raw_file = await download_file(
-                    client=self,
-                    location=file,
-                    out=f,
-                    progress_callback=(
-                        (
-                            lambda completed, total: self.loop.create_task(
-                                progress(completed, total, event, start_time, message)
-                            )
+        async with aiofiles.open(filename, "wb") as f:
+            raw_file = await download_file(
+                client=self,
+                location=file,
+                out=f,
+                progress_callback=(
+                    (
+                        lambda completed, total: self.loop.create_task(
+                            progress(completed, total, event, start_time, message)
                         )
-                        if show_progress
-                        else None
-                    ),
-                )
+                    )
+                    if show_progress
+                    else None
+                ),
+            )
         return raw_file, time.time() - start_time
 
     def run_in_loop(self, function):
