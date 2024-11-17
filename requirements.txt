@@ -7,3 +7,4 @@ pyshorteners
 google-search-results
 motor
 pydantic
+aiofiles
