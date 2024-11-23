@@ -357,11 +357,12 @@ async def sangmata(event):
     user = event.pattern_match.group(2)
     reply = await event.get_reply_message()
     loading = await event.eor("`Processing...`")
+
     if not user and reply:
         user = str(reply.sender_id)
     if not user:
         return await loading.eor(
-            "`Reply to  user's text message to get name/username history or give userid/username`",
+            "`Reply to a user's message or provide their ID/username to fetch name/username history.`",
             time=10,
         )
 
@@ -372,8 +373,9 @@ async def sangmata(event):
             userinfo = await ultroid_bot.get_entity(user)
     except ValueError:
         userinfo = None
+
     if not isinstance(userinfo, types.User):
-        return await loading.eor("`Can't fetch the user...`", time=10)
+        return await loading.eor("`Unable to fetch user details.`", time=10)
 
     async with event.client.conversation("@SangMata_beta_bot") as conv:
         try:
@@ -381,6 +383,7 @@ async def sangmata(event):
         except YouBlockedUserError:
             await catub(unblock("SangMata_beta_bot"))
             await conv.send_message(f"{userinfo.id}")
+        
         responses = []
         while True:
             try:
@@ -391,18 +394,30 @@ async def sangmata(event):
         await event.client.send_read_acknowledge(conv.chat_id)
 
     if not responses:
-        return await loading.eor("`Bot can't fetch results`", time=10)
-    elif "No records found" in responses or "No data available" in responses:
-        return await loading.eor("`The user doesn't have any record`", time=10)
-    elif "quota" in responses:
-        return await loading.eor("`Sangmata quota reached consider paying 5$ for unlimited`", time=10)
-    else:
-        return await loading.eor("`Possible quota may have been reached`", time=10)
+        return await loading.eor("`No response from the bot. Please try again later.`", time=10)
 
+    if any("No data available" in r for r in responses):
+        return await loading.eor(
+            f"**No data available ({userinfo.id})**\n\n**Tips:**\n1. Add this bot to your groups as admin to increase detection.\n"
+            "2. Use search by username. Simply copy a username and send `allhistory @username`.\n"
+            "New data will be added if not available.",
+            time=15,
+        )
+
+    if any("quota" in r.lower() for r in responses):
+        return await loading.eor(
+            "**Quota Exceeded**\n\n"
+            "Sorry, you have used up your quota for today. Quota refreshes daily at 00:00 UTC.\n\n"
+            "**To increase your daily quota:**\n"
+            "- Open private chat with @SangMata_BOT or @SangMata_beta_bot.\n"
+            '- Send "donate <amount>" to the bot (e.g., "donate 500").\n\n'
+            "Need help? Join the support group at @sang_inc.",
+            time=20,
+        )
     try:
         names, usernames = sanga_seperator(responses)
     except ValueError as er:
-        return er
+        return await loading.eor(f"`Error processing data: {er}`", time=10)
 
     check = (usernames, "Username") if cmd == "u" else (names, "Name")
     user_name = (
@@ -410,9 +425,11 @@ async def sangmata(event):
         if userinfo.last_name
         else userinfo.first_name
     )
-    output = f"**➜ User Info :**  {mentionuser(user_name, userinfo.id)}\n**➜ {check[1]} History :**\n{check[0]}"
-    await event.eor(output)
-
+    output = (
+        f"**➜ User Info:** {mentionuser(user_name, userinfo.id)}\n"
+        f"**➜ {check[1]} History:**\n{check[0]}"
+    )
+    await loading.eor(output)
 
 @ultroid_cmd(pattern="webshot( (.*)|$)")
 async def webss(event):
