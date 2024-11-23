@@ -35,6 +35,7 @@ from bs4 import BeautifulSoup
 from requests import get
 from telethon.errors.rpcerrorlist import MessageTooLongError, YouBlockedUserError
 from telethon.tl.functions.contacts import UnblockRequest as unblock
+from telethon.tl import types
 from telethon.tl.types import (
     ChannelParticipantAdmin,
     ChannelParticipantsBots,
