@@ -20,6 +20,8 @@ from telethon.errors.rpcerrorlist import MessageNotModifiedError
 
 from pyUltroid.fns.helper import time_formatter
 from pyUltroid.fns.tools import get_chat_and_msgid, set_attributes
+from telethon.tl.types import DocumentAttributeFilename, DocumentAttributeVideo
+from pyUltroid.fns.tools import metadata
 
 from . import (
     LOGS,
@@ -30,10 +32,65 @@ from . import (
     get_all_files,
     get_string,
     progress,
-    time_formatter,
     ultroid_cmd,
 )
 
+async def extract_thumbnail(file_path, thumbnail_path):
+    try:
+        process = await asyncio.create_subprocess_exec(
+            "ffmpeg",
+            "-i",
+            file_path,
+            "-ss",
+            "00:00:04",
+            "-vframes",
+            "1",
+            thumbnail_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await process.communicate()
+        if process.returncode != 0:
+            raise Exception(stderr.decode())
+    except Exception as e:
+        print("Error extracting thumbnail:", e)
+        # Consider logging the error or handling it appropriately
+
+async def process_video(file_path, directory_path, caption_str, event):
+    if file_path.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
+        meta = await metadata(file_path)
+        video_duration_in_seconds = meta.get("duration")
+        if video_duration_in_seconds is not None:
+            thumbnail_path = os.path.join(directory_path, "thumb.jpg")
+            await extract_thumbnail(file_path, thumbnail_path)
+
+            thumbnail_size = (
+                int(meta.get("width", 0)),
+                int(meta.get("height", 0))
+            )
+            attributes = [
+                DocumentAttributeFilename(os.path.basename(file_path)),
+                DocumentAttributeVideo(
+                    duration=int(video_duration_in_seconds),
+                    w=thumbnail_size[0],
+                    h=thumbnail_size[1],
+                    supports_streaming=True,
+                ),
+            ]
+
+            file, _ = await event.client.fast_uploader(
+                file_path, show_progress=True, event=event, to_delete=True
+            )
+            thumbnail, _ = await event.client.fast_uploader(
+                thumbnail_path, show_progress=True, event=event, to_delete=True
+            )
+            await event.client.send_file(
+                event.chat_id,
+                file,
+                caption=caption_str,
+                attributes=attributes,
+                thumb=thumbnail,
+            )
 
 @ultroid_cmd(
     pattern="download( (.*)|$)",
@@ -140,12 +197,17 @@ async def _(event):
         match = match.strip()
     if not event.out and match == ".env":
         return await event.reply("`You can't do this...`")
-    stream, force_doc, delete, thumb = (
+
+    stream, force_doc, delete, thumb, is_video, custom_caption = (
         False,
         True,
         False,
         ULTConfig.thumb,
+        False,
+        None,
     )
+
+    # Check for flags
     if "--stream" in match:
         stream = True
         force_doc = False
@@ -153,14 +215,18 @@ async def _(event):
         delete = True
     if "--no-thumb" in match:
         thumb = None
-    arguments = ["--stream", "--delete", "--no-thumb"]
-    if any(item in match for item in arguments):
-        match = (
-            match.replace("--stream", "")
-            .replace("--delete", "")
-            .replace("--no-thumb", "")
-            .strip()
-        )
+    if "--video" in match:
+        is_video = True
+
+    # Remove flags from match
+    arguments = ["--stream", "--delete", "--no-thumb", "--video"]
+    for item in arguments:
+        match = match.replace(item, "").strip()
+
+    # Split the match to extract custom caption if provided
+    if "|" in match:
+        match, custom_caption = map(str.strip, match.split("|", 1))
+
     if match.endswith("/"):
         match += "*"
     results = glob.glob(match)
@@ -173,40 +239,65 @@ async def _(event):
         except Exception as er:
             LOGS.exception(er)
         return await msg.eor(get_string("ls1"))
+
     for result in results:
         if os.path.isdir(result):
-            c, s = 0, 0
-            for files in get_all_files(result):
-                attributes = None
-                if stream:
-                    try:
-                        attributes = await set_attributes(files)
-                    except KeyError as er:
-                        LOGS.exception(er)
-                try:
-                    file, _ = await event.client.fast_uploader(
-                        files, show_progress=True, event=msg, to_delete=delete
-                    )
-                    await event.client.send_file(
-                        event.chat_id,
-                        file,
-                        supports_streaming=stream,
-                        force_document=force_doc,
-                        thumb=thumb,
-                        attributes=attributes,
-                        caption=f"`Uploaded` `{files}` `in {time_formatter(_*1000)}`",
-                        reply_to=event.reply_to_msg_id or event,
-                    )
-                    s += 1
-                except (ValueError, IsADirectoryError):
-                    c += 1
-            break
+            return await msg.eor("`Uploading directories is not supported for videos.`")
+
+        # Handle video files specifically
+        if is_video and result.endswith((".mp4", ".avi", ".mov", ".mkv")):
+            try:
+                # Generate metadata
+                meta = await metadata(result)
+                duration = meta.get("duration")
+                width = meta.get("width", 1280)
+                height = meta.get("height", 720)
+
+                # Generate thumbnail
+                thumbnail_path = os.path.join(
+                    os.path.dirname(result), "thumb.jpg"
+                )
+                await extract_thumbnail(result, thumbnail_path)
+
+                # Prepare attributes
+                attributes = [
+                    DocumentAttributeFilename(os.path.basename(result)),
+                    DocumentAttributeVideo(
+                        duration=int(duration),
+                        w=width,
+                        h=height,
+                        supports_streaming=True,
+                    ),
+                ]
+
+                # Upload video with metadata
+                file, _ = await event.client.fast_uploader(
+                    result, show_progress=True, event=msg, to_delete=delete
+                )
+                await event.client.send_file(
+                    event.chat_id,
+                    file,
+                    supports_streaming=True,
+                    thumb=thumbnail_path if os.path.exists(thumbnail_path) else None,
+                    attributes=attributes,
+                    caption=custom_caption or f"`Uploaded: {os.path.basename(result)}`",
+                    reply_to=event.reply_to_msg_id or event,
+                )
+                if delete and os.path.exists(thumbnail_path):
+                    os.remove(thumbnail_path)
+            except Exception as e:
+                LOGS.exception(e)
+                await msg.eor(f"Failed to upload `{result}`: {e}")
+            continue
+
+        # Handle non-video files
         attributes = None
         if stream:
             try:
                 attributes = await set_attributes(result)
             except KeyError as er:
                 LOGS.exception(er)
+
         file, _ = await event.client.fast_uploader(
             result, show_progress=True, event=msg, to_delete=delete
         )
@@ -217,6 +308,6 @@ async def _(event):
             force_document=force_doc,
             thumb=thumb,
             attributes=attributes,
-            caption=f"`Uploaded` `{result}` `in {time_formatter(_*1000)}`",
+            caption=custom_caption or f"`Uploaded` `{os.path.basename(result)}`",
         )
     await msg.try_delete()
