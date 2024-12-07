@@ -840,67 +840,113 @@ async def get_restricted_msg(event):
     except ChatForwardsRestrictedError:
         pass
     
-    if message.media:
-        if isinstance(message.media, (MessageMediaPhoto, MessageMediaDocument)):
-            media_path, _ = await event.client.fast_downloader(message.document, show_progress=True, event=xx, message=get_string("com_5"))
+    if not message.media:
+        return await event.eor("`No media found in the message.`")
+    
+    media_path = None
+    caption = message.text or ""
+    
+    if isinstance(message.media, MessageMediaPhoto):
+        try:
+            media_path = await event.client.download_media(
+                message.photo,
+                progress_callback=lambda d, t: xx.edit(f"{get_string('com_5')} {d}/{t}")
+            )
+        except Exception as e:
+            return await event.eor(f"**ERROR**\n`Download failed: {str(e)}`")
+        
+        try:
+            await event.client.send_file(
+                event.chat_id,
+                media_path,
+                caption=caption,
+                force_document=False
+            )
+        except MessageTooLongError:
+            if len(caption) > CAPTION_LIMIT:
+                caption = caption[:CAPTION_LIMIT] + "..."
+            await event.client.send_file(
+                event.chat_id,
+                media_path,
+                caption=caption,
+                force_document=False
+            )
+    
+    elif isinstance(message.media, MessageMediaDocument):
+        try:
+            media_path, _ = await event.client.fast_downloader(
+                message.media.document,
+                show_progress=True,
+                event=xx,
+                message=get_string("com_5")
+            )
+        except Exception as e:
+            return await event.eor(f"**ERROR**\n`Download failed: {str(e)}`")
+        
+        attributes = []
+        if message.video:
+            duration = await get_video_duration(media_path.name)
+            
+            width, height = 0, 0
+            for attribute in message.media.document.attributes:
+                if isinstance(attribute, DocumentAttributeVideo):
+                    width = attribute.w
+                    height = attribute.h
+                    break
+            
+            thumb_path = media_path.name + "_thumb.jpg"
+            await get_thumbnail(media_path.name, thumb_path)
 
-            caption = message.text or ""
-
-            attributes = []
-            if message.video:
-                duration = await get_video_duration(media_path.name)
-                
-                width, height = 0, 0
-                for attribute in message.document.attributes:
-                    if isinstance(attribute, DocumentAttributeVideo):
-                        width = attribute.w
-                        height = attribute.h
-                        break
-                
-                thumb_path = media_path.name + "_thumb.jpg"
-                await get_thumbnail(media_path.name, thumb_path)
-
-                attributes.append(
-                    DocumentAttributeVideo(
-                        duration=int(duration) if duration else 0,
-                        w=width,
-                        h=height,
-                        supports_streaming=True,
-                    )
+            attributes.append(
+                DocumentAttributeVideo(
+                    duration=int(duration) if duration else 0,
+                    w=width,
+                    h=height,
+                    supports_streaming=True,
                 )
-            await xx.edit(get_string("com_6"))
-            media_path, _ = await event.client.fast_uploader(media_path.name, event=xx, show_progress=True, to_delete=True)
+            )
+        
+        await xx.edit(get_string("com_6"))
+        try:
+            media_path, _ = await event.client.fast_uploader(
+                media_path.name,
+                event=xx,
+                show_progress=True,
+                to_delete=True
+            )
+        except Exception as e:
+            return await event.eor(f"**ERROR**\n`Upload failed: {str(e)}`")
 
-            try:
-                await event.client.send_file(
-                    event.chat_id,
-                    media_path,
-                    caption=caption,
-                    force_document=False,
-                    supports_streaming=True if message.video else False,
-                    thumb=thumb_path if message.video else None,
-                    attributes=attributes if message.video else None,
-                )
-            except MessageTooLongError:
-                if len(caption) > CAPTION_LIMIT:
-                    caption = caption[:CAPTION_LIMIT] + "..."
-                await event.client.send_file(
-                    event.chat_id,
-                    media_path,
-                    caption=caption,
-                    force_document=False,  # Set to True if you want to send as a document
-                    supports_streaming=True if message.video else False,
-                    thumb=thumb_path if message.video else None,
-                    attributes=attributes if message.video else None,
-                )
+        try:
+            await event.client.send_file(
+                event.chat_id,
+                media_path,
+                caption=caption,
+                force_document=False,
+                supports_streaming=True if message.video else False,
+                thumb=thumb_path if message.video else None,
+                attributes=attributes if message.video else None,
+            )
+        except MessageTooLongError:
+            if len(caption) > CAPTION_LIMIT:
+                caption = caption[:CAPTION_LIMIT] + "..."
+            await event.client.send_file(
+                event.chat_id,
+                media_path,
+                caption=caption,
+                force_document=False,
+                supports_streaming=True if message.video else False,
+                thumb=thumb_path if message.video else None,
+                attributes=attributes if message.video else None,
+            )
 
-            if message.video and os.path.exists(thumb_path):
-                os.remove(thumb_path)
-            await xx.try_delete()
-        else:
-            await event.eor("`Cannot process this type of media.`")
+        if message.video and os.path.exists(thumb_path):
+            os.remove(thumb_path)
+    
     else:
-        await event.eor("`No media found in the message.`")
+        await event.eor("`Cannot process this type of media.`")
+    
+    await xx.try_delete()
 
 
 @ultroid_cmd(pattern="lastpm$", fullsudo=True)
