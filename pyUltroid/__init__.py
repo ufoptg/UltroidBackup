@@ -51,6 +51,7 @@ if run_as_module:
     from .startup.connections import validate_session, vc_connection
     from .startup.funcs import _version_changes, autobot, enable_inline, update_envs
     from .version import ultroid_version
+    from py_tgcalls import PyTgCalls
 
     if not os.path.exists("./plugins"):
         LOGS.error(
@@ -114,7 +115,8 @@ if run_as_module:
     elif not asst.me.bot_inline_placeholder and asst._bot:
         ultroid_bot.run_in_loop(enable_inline(ultroid_bot, asst.me.username))
 
-    vcClient = vc_connection(udB, ultroid_bot)
+    vc_client, call_client = await ultroid_bot.run_in_loop(vc_connection(udB, ultroid_bot))  # Modified Line
+    await call_client.start()
 
     _version_changes(udB)
 
@@ -128,4 +130,5 @@ else:
 
     LOGS = getLogger("pyUltroid")
 
-    ultroid_bot = asst = udB = vcClient = None
+    ultroid_bot = asst = udB = vc_client = call_client = None  # Add call_client here
+
