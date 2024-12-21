@@ -44,9 +44,9 @@ socket.getaddrinfo = custom_getaddrinfo
 
 async def initialize_vc_client(udB, ultroid_bot):
     LOGS.info("Initialising PyTgCalls...")
-    vc_client, call_client = await vc_connection(udB, ultroid_bot)
+    vcClient, call_client = await vc_connection(udB, ultroid_bot)
     await call_client.start()
-    return vc_client, call_client
+    return vcClient, call_client
 
 
 if run_as_module:
@@ -123,7 +123,7 @@ if run_as_module:
     elif not asst.me.bot_inline_placeholder and asst._bot:
         ultroid_bot.run_in_loop(enable_inline(ultroid_bot, asst.me.username))
 
-    vc_client, call_client = ultroid_bot.run_in_loop(initialize_vc_client(udB, ultroid_bot))
+    vcClient, call_client = ultroid_bot.run_in_loop(initialize_vc_client(udB, ultroid_bot))
 
     _version_changes(udB)
 
@@ -137,4 +137,4 @@ else:
 
     LOGS = getLogger("pyUltroid")
 
-    ultroid_bot = asst = udB = vc_client = call_client = None
+    ultroid_bot = asst = udB = vcClient = call_client = None
