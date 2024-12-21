@@ -8,3 +8,4 @@ google-search-results
 motor
 pydantic
 aiofiles
+py-tgcalls
