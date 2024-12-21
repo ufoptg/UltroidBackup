@@ -17,8 +17,8 @@ from ..configs import Var
 from . import *
 from .BaseClient import UltroidClient
 
-from py_tgcalls import PyTgCalls
-from py_tgcalls.exceptions import (
+from pytgcalls import PyTgCalls
+from pytgcalls.exceptions import (
     AlreadyJoinedError,
     NoActiveGroupCall,
     NotInGroupCallError,
