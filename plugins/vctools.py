@@ -17,16 +17,12 @@
 
 from telethon.tl.functions.channels import GetFullChannelRequest as getchat
 from telethon.tl.functions.phone import GetGroupCallRequest as getvc
-from py_tgcalls import PyTgCalls
-from py_tgcalls.exceptions import NoActiveGroupCall, AlreadyJoinedError
-from py_tgcalls.types.input_stream import AudioPiped
-from py_tgcalls.types import Update
+from pytgcalls import PyTgCalls
+from pytgcalls.types import MediaStream
+from pytgcalls.exceptions import NoActiveGroupCall, AlreadyJoinedError
+from pytgcalls.types import Update
 from pytgcalls import StreamType
-from pytgcalls.types import (
-    JoinedGroupCallPayload,
-    LeftGroupCallPayload,
-    MediaStreamErrorPayload,
-)
+
 
 from . import get_string, ultroid_cmd, LOGS, vc_connection, call_client
 
@@ -76,7 +72,6 @@ async def _(event):
             LOGS.error(f"Error inviting user {user_id}: {e}")
     
     await ok.edit(get_string("vct_5").format(z))
-
 @ultroid_cmd(
     pattern="startvc$",
     admins_only=True,
@@ -85,12 +80,19 @@ async def _(event):
 async def _(event):
     try:
         chat = await event.get_chat()
+        audio_url = "https://t.me/vc-audio-test/2"  # Replace with the actual audio URL if needed
+        media_stream = MediaStream(
+            audio_url,
+            video_flags=MediaStream.Flags.IGNORE  # Assuming you only want audio
+        )
         call = await call_client.join_group_call(
             chat.id,
-            AudioPiped("https://t.me/vc-audio-test/2"), # Use a dummy audio file, we only want to start the call
-            stream_type=StreamType().pulse_stream,
+            media_stream,
+            stream_type=StreamType().pulse_stream,  # Assuming you want pulse stream type
         )
+        
         await event.eor(get_string("vct_1"))
+    
     except NoActiveGroupCall:
         await event.eor("No active group call found. You may need to start one in the Telegram client.")
     except AlreadyJoinedError:
