@@ -10,12 +10,26 @@ import ipaddress
 import struct
 import sys
 
-from telethon.errors.rpcerrorlist import AuthKeyDuplicatedError
+from telethon.errors.rpcerrorlist import AuthKeyDuplicatedError, SessionPasswordNeededError, PhoneNumberInvalidError
 from telethon.sessions.string import _STRUCT_PREFORMAT, CURRENT_VERSION, StringSession
 
 from ..configs import Var
 from . import *
 from .BaseClient import UltroidClient
+
+from py_tgcalls import PyTgCalls
+from py_tgcalls.exceptions import (
+    AlreadyJoinedError,
+    NoActiveGroupCall,
+    NotInGroupCallError,
+)
+from pytgcalls.types import Update
+from pytgcalls.types.input_stream import AudioPiped, AudioVideoPiped
+from pytgcalls.types import (
+    JoinedGroupCallPayload,
+    LeftGroupCallPayload,
+    MediaStreamErrorPayload,
+)
 
 _PYRO_FORM = {351: ">B?256sI?", 356: ">B?256sQ?", 362: ">BI?256sQ?"}
 
@@ -28,7 +42,6 @@ DC_IPV4 = {
     4: "149.154.167.91",
     5: "91.108.56.130",
 }
-
 
 def validate_session(session, logger=LOGS, _exit=True):
     from strings import get_string
@@ -72,23 +85,26 @@ def validate_session(session, logger=LOGS, _exit=True):
     if _exit:
         sys.exit()
 
-
-def vc_connection(udB, ultroid_bot):
+async def vc_connection(udB, ultroid_bot):
     from strings import get_string
 
     VC_SESSION = Var.VC_SESSION or udB.get_key("VC_SESSION")
     if VC_SESSION and VC_SESSION != Var.SESSION:
         LOGS.info("Starting up VcClient.")
         try:
-            return UltroidClient(
+            vc_client = UltroidClient(
                 validate_session(VC_SESSION, _exit=False),
                 log_attempt=False,
                 exit_on_error=False,
             )
+            call_client = PyTgCalls(vc_client)
+            return vc_client, call_client
         except (AuthKeyDuplicatedError, EOFError):
             LOGS.info(get_string("py_c3"))
             udB.del_key("VC_SESSION")
         except Exception as er:
             LOGS.info("While creating Client for VC.")
             LOGS.exception(er)
-    return ultroid_bot
+    else:
+        call_client = PyTgCalls(ultroid_bot)
+        return ultroid_bot, call_client
