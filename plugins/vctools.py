@@ -21,7 +21,6 @@ from pytgcalls import PyTgCalls
 from pytgcalls.types import MediaStream
 from pytgcalls.exceptions import NoActiveGroupCall, AlreadyJoinedError
 from pytgcalls.types import Update
-from pytgcalls import StreamType
 
 
 from . import get_string, ultroid_cmd, LOGS, vc_connection, call_client
@@ -72,6 +71,7 @@ async def _(event):
             LOGS.error(f"Error inviting user {user_id}: {e}")
     
     await ok.edit(get_string("vct_5").format(z))
+
 @ultroid_cmd(
     pattern="startvc$",
     admins_only=True,
@@ -88,7 +88,6 @@ async def _(event):
         call = await call_client.join_group_call(
             chat.id,
             media_stream,
-            stream_type=StreamType().pulse_stream,  # Assuming you want pulse stream type
         )
         
         await event.eor(get_string("vct_1"))
