@@ -41,6 +41,12 @@ def custom_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
 socket.getaddrinfo = custom_getaddrinfo
 
 
+async def initialize_vc_client(udB, ultroid_bot):
+    vc_client, call_client = await vc_connection(udB, ultroid_bot)
+    await call_client.start()
+    return vc_client, call_client
+
+
 if run_as_module:
     import time
 
@@ -115,8 +121,7 @@ if run_as_module:
     elif not asst.me.bot_inline_placeholder and asst._bot:
         ultroid_bot.run_in_loop(enable_inline(ultroid_bot, asst.me.username))
 
-    vc_client, call_client = await ultroid_bot.run_in_loop(vc_connection(udB, ultroid_bot))  # Modified Line
-    await call_client.start()
+    vc_client, call_client = await initialize_vc_client(udB, ultroid_bot)
 
     _version_changes(udB)
 
@@ -130,5 +135,4 @@ else:
 
     LOGS = getLogger("pyUltroid")
 
-    ultroid_bot = asst = udB = vc_client = call_client = None  # Add call_client here
-
+    ultroid_bot = asst = udB = vc_client = call_client = None
