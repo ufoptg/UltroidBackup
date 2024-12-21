@@ -58,7 +58,7 @@ if run_as_module:
     from .startup.connections import validate_session, vc_connection
     from .startup.funcs import _version_changes, autobot, enable_inline, update_envs
     from .version import ultroid_version
-    from py_tgcalls import PyTgCalls
+    from pytgcalls import PyTgCalls
 
     if not os.path.exists("./plugins"):
         LOGS.error(
