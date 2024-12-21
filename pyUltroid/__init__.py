@@ -122,7 +122,7 @@ if run_as_module:
     elif not asst.me.bot_inline_placeholder and asst._bot:
         ultroid_bot.run_in_loop(enable_inline(ultroid_bot, asst.me.username))
 
-    vc_client, call_client = asyncio.run(initialize_vc_client(udB, ultroid_bot))
+    vc_client, call_client = ultroid_bot.run_in_loop(initialize_vc_client(udB, ultroid_bot))
 
     _version_changes(udB)
 
