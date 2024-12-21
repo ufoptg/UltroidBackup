@@ -43,6 +43,7 @@ socket.getaddrinfo = custom_getaddrinfo
 
 
 async def initialize_vc_client(udB, ultroid_bot):
+    LOGS.info("Initialising PyTgCalls...")
     vc_client, call_client = await vc_connection(udB, ultroid_bot)
     await call_client.start()
     return vc_client, call_client
