@@ -24,12 +24,6 @@ from pytgcalls.exceptions import (
     NotInGroupCallError,
 )
 from pytgcalls.types import Update
-#from pytgcalls.types.input_stream import AudioPiped, AudioVideoPiped
-from pytgcalls.types import (
-    JoinedGroupCallPayload,
-    LeftGroupCallPayload,
-    MediaStreamErrorPayload,
-)
 
 _PYRO_FORM = {351: ">B?256sI?", 356: ">B?256sQ?", 362: ">BI?256sQ?"}
 
