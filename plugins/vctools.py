@@ -28,12 +28,8 @@ from pytgcalls.types import (
     MediaStreamErrorPayload,
 )
 
-from . import get_string, ultroid_cmd, LOGS, vc_connection, Var, udB
+from . import get_string, ultroid_cmd, LOGS, vc_connection, call_client
 
-VC_SESSION = Var.VC_SESSION or udB.get_key("VC_SESSION")
-
-# Initialize call_client (assuming you have this in your main bot logic)
-_, call_client = vc_connection(VC_SESSION, ultroid_bot) # Pass your UDB_STRING variable
 
 async def get_group_call(event):
     chat = await event.get_chat()
