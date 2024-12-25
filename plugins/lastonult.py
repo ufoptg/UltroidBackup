@@ -330,7 +330,12 @@ async def _(event):
 @ultroid_bot.on(events.NewMessage(incoming=True))
 @ultroid_bot.on(events.ChatAction)
 async def all_messages_catcher(event):
-    sender = await event.get_sender()
+    if isinstance(event, events.NewMessage.Event):
+        sender = await event.get_sender()
+    elif isinstance(event, events.ChatAction.Event):
+        sender = event.user
+    else:
+        return
 
     if sender is None:
         return
