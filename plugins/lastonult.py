@@ -333,7 +333,7 @@ async def all_messages_catcher(event):
     if isinstance(event, events.NewMessage.Event):
         sender = await event.get_sender()
     elif isinstance(event, events.ChatAction.Event):
-        sender = event.user
+        sender = event.sender
     else:
         return
 
