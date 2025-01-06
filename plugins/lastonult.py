@@ -334,7 +334,7 @@ async def all_messages_catcher(event):
         sender = await event.get_sender()
     elif isinstance(event, events.ChatAction.Event):
         action_user_id = event.action_message.from_id.user_id
-        sender = await client.get_entity(action_user_id)
+        sender = await ultroid_bot.get_entity(action_user_id)
         utc_time = event.action_message.date.replace(tzinfo=utc_tz)
     else:
         return
