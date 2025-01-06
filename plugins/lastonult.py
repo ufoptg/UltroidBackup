@@ -333,7 +333,9 @@ async def all_messages_catcher(event):
     if isinstance(event, events.NewMessage.Event):
         sender = await event.get_sender()
     elif isinstance(event, events.ChatAction.Event):
-        sender = await event.action_message.get_sender()
+        action_user_id = event.action_message.from_id.user_id
+        sender = await client.get_entity(action_user_id)
+        utc_time = event.action_message.date.replace(tzinfo=utc_tz)
     else:
         return
 
